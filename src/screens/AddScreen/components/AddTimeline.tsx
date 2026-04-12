@@ -65,14 +65,14 @@ export default function AddTimeline({
 
   return (
     <View style={styles.timelineCard}>
-      {!hasSessions ? (
+      {/* {!hasSessions ? (
         <View style={styles.emptyDayCard}>
           <Text style={styles.emptyDayTitle}>No walks saved yet</Text>
           <Text style={styles.emptyDayText}>
             Tap the add button on a time slot, or use the floating action button to log today’s walk.
           </Text>
         </View>
-      ) : null}
+      ) : null} */}
 
       {groupedTimeline.map(({ hour, sessions }) => (
         <View

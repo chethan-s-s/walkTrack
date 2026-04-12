@@ -207,7 +207,6 @@ export default function MoreScreen() {
           <View style={styles.row}>
             <View style={styles.rowTextWrap}>
               <Text style={styles.rowTitle}>Add screen hours</Text>
-              <Text style={styles.rowDescription}>Visible hours in the timeline.</Text>
             </View>
             <Text style={styles.timelineHint}>{timelineHelperText}</Text>
 

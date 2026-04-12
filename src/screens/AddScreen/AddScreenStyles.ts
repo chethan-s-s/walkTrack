@@ -20,7 +20,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     flex: 1,
   },
   timelineScrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 80,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -28,7 +28,8 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: 24,
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 0,
     borderWidth: 1,
     borderColor: colors.border,
     gap: 12,
@@ -50,7 +51,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   summaryRingWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ scale: 0.78 }],
+    transform: [{ scale: 0.82 }],
     flexShrink: 0,
   },
   summaryMeta: {
@@ -194,7 +195,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   timelineContentColumn: {
     flex: 1,
     paddingBottom: 8,
-    paddingLeft: 18,
+    paddingLeft: 12,
   },
   timelineContentColumnCreateActive: {
     backgroundColor: colors.surfaceAlt,
@@ -228,9 +229,9 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     flexShrink: 0,
   },
   hourCurrentDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: colors.accent,
   },
   sessionList: {
@@ -253,9 +254,9 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     opacity: 0.45,
   },
   sessionDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: colors.textPrimary,
   },
   sessionTextWrap: {
@@ -338,9 +339,9 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     marginLeft: -2,
   },
   emptyHourDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: colors.textMuted,
   },
   adjustRow: {

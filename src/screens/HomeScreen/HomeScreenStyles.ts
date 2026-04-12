@@ -376,11 +376,11 @@ export const createStyles = (colors: AppColors) =>
     heatmapCell: {
       width: '13.2%',
       aspectRatio: 1,
-      borderRadius: 8,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
       padding: 8,
-      borderWidth: 1,
+      borderWidth: 2,
       borderColor: 'transparent',
       overflow: 'visible',
     },
@@ -400,7 +400,7 @@ export const createStyles = (colors: AppColors) =>
     heatmapTooltip: {
       position: 'absolute',
       bottom: '100%',
-      marginBottom: 6,
+      marginBottom: 10,
       minWidth: 54,
       borderRadius: 999,
       paddingHorizontal: 10,
@@ -421,7 +421,7 @@ export const createStyles = (colors: AppColors) =>
     },
     heatmapLabel: {
       color: colors.textMuted,
-      fontSize: 12,
+      fontSize: 13,
       lineHeight: 12,
       fontWeight: '700',
       textAlign: 'center',
@@ -440,7 +440,7 @@ export const createStyles = (colors: AppColors) =>
     },
     heatmapLegendText: {
       color: colors.textMuted,
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '600',
     },
     heatmapLegendScale: {
