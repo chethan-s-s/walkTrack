@@ -78,6 +78,28 @@ export const createStyles = (colors: AppColors) =>
       fontSize: 13,
       fontWeight: '800',
     },
+    milestonePill: {
+      alignSelf: 'flex-start',
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 2,
+    },
+    milestoneTitle: {
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    milestoneText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 16,
+    },
     reminderCard: {
       backgroundColor: colors.warning,
       borderRadius: 22,
@@ -128,6 +150,11 @@ export const createStyles = (colors: AppColors) =>
       color: colors.textPrimary,
       fontSize: 28,
       fontWeight: '800',
+    },
+    cardMeta: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
     },
     insightsCard: {
       backgroundColor: colors.surface,
@@ -351,9 +378,11 @@ export const createStyles = (colors: AppColors) =>
       aspectRatio: 1,
       borderRadius: 8,
       alignItems: 'center',
+      justifyContent: 'center',
       padding: 8,
       borderWidth: 1,
       borderColor: 'transparent',
+      overflow: 'visible',
     },
     heatmapCellContent: {
       flex: 1,
@@ -363,6 +392,28 @@ export const createStyles = (colors: AppColors) =>
     },
     heatmapCellToday: {
       borderColor: colors.textPrimary,
+    },
+    heatmapCellSelected: {
+      borderColor: colors.accent,
+      borderWidth: 2,
+    },
+    heatmapTooltip: {
+      position: 'absolute',
+      bottom: '100%',
+      marginBottom: 6,
+      minWidth: 54,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: colors.textPrimary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 5,
+    },
+    heatmapTooltipText: {
+      color: colors.background,
+      fontSize: 11,
+      fontWeight: '800',
     },
     heatmapCellEmpty: {
       backgroundColor: 'transparent',

@@ -44,10 +44,29 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
   },
+  summaryValueWrap: {
+    flex: 1,
+  },
+  summaryRingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ scale: 0.78 }],
+    flexShrink: 0,
+  },
   summaryMeta: {
     color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  summaryMetaWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  summaryMetaSecondary: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
   },
   dateRow: {
     flexDirection: 'row',
@@ -120,6 +139,25 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: 0,
+  },
+  emptyDayCard: {
+    marginBottom: 12,
+    borderRadius: 20,
+    padding: 14,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+    gap: 6,
+  },
+  emptyDayTitle: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  emptyDayText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
   },
   timelineRow: {
     position: 'relative',
@@ -518,11 +556,13 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
+    textAlign: 'center',
   },
   modalSubtitle: {
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
   },
   modalCounterCard: {
     backgroundColor: colors.surfaceAlt,
@@ -633,6 +673,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
   dialogOverlay: {
     flex: 1,

@@ -10,9 +10,17 @@ type GoalProgressRingProps = {
   colors: AppColors;
   label: string;
   sublabel: string;
+  progressColor?: string;
 };
 
-export default function GoalProgressRing({ colors, goal, label, sublabel, value }: GoalProgressRingProps) {
+export default function GoalProgressRing({
+  colors,
+  goal,
+  label,
+  progressColor,
+  sublabel,
+  value,
+}: GoalProgressRingProps) {
   const radius = 46;
   const strokeWidth = 10;
   const normalizedRadius = radius - strokeWidth / 2;
@@ -36,7 +44,7 @@ export default function GoalProgressRing({ colors, goal, label, sublabel, value 
           cy={radius}
           fill="transparent"
           r={normalizedRadius}
-          stroke={colors.accent}
+          stroke={progressColor ?? colors.accent}
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"

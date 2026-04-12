@@ -6,20 +6,35 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import GoalProgressRing from '../../components/GoalProgressRing';
+import { useTimelineHours } from '../../hooks/useTimelineHours';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { getDateKey } from '../../storage/walkingStorage';
 import { useAppColors } from '../../theme/useAppColors';
 import { WalkingSession } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
+import {
+  buildSessionSegments,
+  doesTimeRangeCollide,
+  formatDateKeyTimeRange,
+  formatReadableDate,
+  formatTimeLabel,
+  getDefaultTargetHour,
+  getHourRange,
+  getHoursForMinutes,
+  getSuggestedStartMinute,
+  normalizeHour,
+  normalizeMinute,
+} from '../../utils/time';
+import AddTimeline from './components/AddTimeline';
+import SessionModal from './components/SessionModal';
 import { createStyles } from './AddScreenStyles';
 
 const QUICK_MINUTES = [15, 30, 45, 60];
@@ -48,8 +63,6 @@ type ToastMessage = {
 };
 
 const clampMinutes = (minutes: number) => Math.max(5, Math.min(240, minutes));
-const normalizeHour = (hour: number) => ((hour % 24) + 24) % 24;
-const normalizeMinute = (minute: number) => ((minute % 60) + 60) % 60;
 const getDefaultTargetMinute = () => new Date().getMinutes();
 
 const getPositiveMinutes = (value: string) => {
@@ -60,182 +73,6 @@ const getPositiveMinutes = (value: string) => {
   }
 
   return numericValue;
-};
-
-const buildSessionSegments = (totalMinutes: number, startingHour: number, startingMinute: number) => {
-  const segments: Array<{ hour: number; minute: number; minutes: number }> = [];
-  let remainingMinutes = totalMinutes;
-  let currentHour = normalizeHour(startingHour);
-  let currentMinute = normalizeMinute(startingMinute);
-
-  while (remainingMinutes > 0) {
-    const availableMinutes = segments.length === 0 ? 60 - currentMinute : 60;
-    const segmentMinutes = Math.min(remainingMinutes, availableMinutes);
-    segments.push({ hour: currentHour, minute: currentMinute, minutes: segmentMinutes });
-    remainingMinutes -= segmentMinutes;
-    currentHour = normalizeHour(currentHour + 1);
-    currentMinute = 0;
-  }
-
-  return segments;
-};
-
-const getTimelineHours = (startHour: number, endHour: number) => {
-  const hours: number[] = [];
-  let currentHour = normalizeHour(startHour);
-  const normalizedEndHour = normalizeHour(endHour);
-
-  for (let index = 0; index < 24; index += 1) {
-    hours.push(currentHour);
-
-    if (currentHour === normalizedEndHour) {
-      break;
-    }
-
-    currentHour = normalizeHour(currentHour + 1);
-  }
-
-  return hours;
-};
-
-const getHourRange = (hours: number[], startHour: number, endHour: number) => {
-  const startIndex = hours.indexOf(startHour);
-  const endIndex = hours.indexOf(endHour);
-
-  if (startIndex === -1 || endIndex === -1) {
-    return [] as number[];
-  }
-
-  const [rangeStart, rangeEnd] = startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
-  return hours.slice(rangeStart, rangeEnd + 1);
-};
-
-const getHoursForMinutes = (minutes: number, startingHour: number, startingMinute: number) =>
-  buildSessionSegments(minutes, startingHour, startingMinute).map((segment) => segment.hour);
-
-const getYesterdayDate = () => {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday;
-};
-
-const formatReadableDate = (date: Date) =>
-  getDateKey(date) === getDateKey()
-    ? 'Today'
-    : getDateKey(date) === getDateKey(getYesterdayDate())
-      ? 'Yesterday'
-    : date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric',
-      });
-
-const formatHourLabel = (hour: number) => {
-  if (hour === 0) {
-    return '12 AM';
-  }
-
-  if (hour < 12) {
-    return `${hour} AM`;
-  }
-
-  if (hour === 12) {
-    return '12 PM';
-  }
-
-  return `${hour - 12} PM`;
-};
-
-const formatSessionTime = (createdAt: string) =>
-  new Date(createdAt).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-
-const formatTimeLabel = (hour: number, minute: number) => {
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
-  return `${normalizedHour}:${String(normalizeMinute(minute)).padStart(2, '0')} ${suffix}`;
-};
-
-const formatClockTime = (date: Date) =>
-  date.toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-
-const formatSessionTimeRange = (createdAt: string, durationMinutes: number) => {
-  const start = new Date(createdAt);
-  const end = new Date(start.getTime() + durationMinutes * 60_000);
-
-  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
-};
-
-const getTimestampForDateTime = (dateKey: string, hour: number, minute: number) => {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day, normalizeHour(hour), normalizeMinute(minute), 0, 0);
-};
-
-const formatDateKeyTimeRange = (dateKey: string, hour: number, minute: number, durationMinutes: number) => {
-  const start = getTimestampForDateTime(dateKey, hour, minute);
-  const end = new Date(start.getTime() + durationMinutes * 60_000);
-
-  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
-};
-
-const getSuggestedStartMinute = (dateKey: string, hour: number, sessions: WalkingSession[]) => {
-  const normalizedHour = normalizeHour(hour);
-  const sessionsInHour = sessions
-    .filter((session) => {
-      const start = new Date(session.createdAt);
-      return start.getHours() === normalizedHour;
-    })
-    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
-
-  if (!sessionsInHour.length) {
-    return 0;
-  }
-
-  const lastSession = sessionsInHour[sessionsInHour.length - 1];
-  const lastSessionEnd = new Date(new Date(lastSession.createdAt).getTime() + lastSession.minutes * 60_000);
-
-  if (lastSessionEnd.getHours() !== normalizedHour) {
-    return 0;
-  }
-
-  return lastSessionEnd.getMinutes();
-};
-
-const doesTimeRangeCollide = (
-  dateKey: string,
-  sessions: WalkingSession[],
-  nextSegments: Array<{ hour: number; minute: number; minutes: number }>,
-  excludedSessionIds: string[] = [],
-) => {
-  const excludedIds = new Set(excludedSessionIds);
-
-  return nextSegments.some((segment) => {
-    const nextStart = getTimestampForDateTime(dateKey, segment.hour, segment.minute);
-    const nextEnd = new Date(nextStart.getTime() + segment.minutes * 60_000);
-
-    return sessions
-      .filter((session) => !excludedIds.has(session.id))
-      .some((session) => {
-        const existingStart = new Date(session.createdAt);
-        const existingEnd = new Date(existingStart.getTime() + session.minutes * 60_000);
-        return nextStart < existingEnd && nextEnd > existingStart;
-      });
-  });
-};
-
-const getDefaultTargetHour = (visibleHours: number[]) => {
-  const currentHour = new Date().getHours();
-
-  if (visibleHours.includes(currentHour)) {
-    return currentHour;
-  }
-
-  return visibleHours[0] ?? 6;
 };
 
 export default function AddScreen() {
@@ -249,9 +86,9 @@ export default function AddScreen() {
     saveWalkingSession,
     updateWalkingSession,
   } = useWalkingData();
-  const visibleHours = useMemo(
-    () => getTimelineHours(settings.timelineStartHour, settings.timelineEndHour),
-    [settings.timelineEndHour, settings.timelineStartHour],
+  const { defaultTargetHour, visibleHours } = useTimelineHours(
+    settings.timelineStartHour,
+    settings.timelineEndHour,
   );
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [draftMinutes, setDraftMinutes] = useState('30');
@@ -259,7 +96,7 @@ export default function AddScreen() {
   const [sessionPendingDelete, setSessionPendingDelete] = useState<WalkingSession | null>(null);
   const [editingSession, setEditingSession] = useState<WalkingSession | null>(null);
   const [undoSessions, setUndoSessions] = useState<WalkingSession[] | null>(null);
-  const [targetHour, setTargetHour] = useState(() => getDefaultTargetHour(visibleHours));
+  const [targetHour, setTargetHour] = useState(() => defaultTargetHour);
   const [targetMinute, setTargetMinute] = useState(getDefaultTargetMinute());
   const [toastItems, setToastItems] = useState<ToastMessage[]>([]);
   const [rowMeasurements, setRowMeasurements] = useState<Record<number, TimelineRowMeasurement>>({});
@@ -277,6 +114,15 @@ export default function AddScreen() {
   const canGoForward = !isCurrentDate;
   const selectedEntry = getEntryForDate(selectedKey);
   const totalMinutes = selectedEntry?.totalMinutes ?? 0;
+  const averageSessionLength = useMemo(() => {
+    const sessions = selectedEntry?.sessions ?? [];
+
+    if (!sessions.length) {
+      return 0;
+    }
+
+    return Math.round(sessions.reduce((total, session) => total + session.minutes, 0) / sessions.length);
+  }, [selectedEntry?.sessions]);
   const pendingDeleteSessions = useMemo(() => {
     if (!sessionPendingDelete) {
       return [] as WalkingSession[];
@@ -356,9 +202,9 @@ export default function AddScreen() {
 
   useEffect(() => {
     if (!visibleHours.includes(targetHour)) {
-      setTargetHour(getDefaultTargetHour(visibleHours));
+      setTargetHour(defaultTargetHour);
     }
-  }, [targetHour, visibleHours]);
+  }, [defaultTargetHour, targetHour, visibleHours]);
 
   const latestWarningToast = useMemo(
     () => [...toastItems].reverse().find((toastItem) => toastItem.type === 'warning') ?? null,
@@ -532,7 +378,16 @@ export default function AddScreen() {
   };
 
   const shiftTargetHour = (delta: -1 | 1) => {
-    setTargetHour((currentValue) => normalizeHour(currentValue + delta));
+    setTargetHour((currentValue) => {
+      const currentIndex = visibleHours.indexOf(currentValue);
+
+      if (currentIndex === -1) {
+        return defaultTargetHour;
+      }
+
+      const nextIndex = (currentIndex + delta + visibleHours.length) % visibleHours.length;
+      return visibleHours[nextIndex] ?? currentValue;
+    });
   };
 
   const shiftTargetMinute = (delta: -1 | 1) => {
@@ -566,7 +421,7 @@ export default function AddScreen() {
       return;
     }
 
-    const startMinute = getSuggestedStartMinute(selectedKey, selectedHours[0], selectedEntry?.sessions ?? []);
+    const startMinute = getSuggestedStartMinute(selectedHours[0], selectedEntry?.sessions ?? []);
     const nextSegments = buildSessionSegments(selectedHours.length * 60, selectedHours[0], startMinute);
     const hasOverlap = doesTimeRangeCollide(selectedKey, selectedEntry?.sessions ?? [], nextSegments);
 
@@ -773,7 +628,12 @@ export default function AddScreen() {
       <View style={styles.content}>
         <View style={styles.fixedHeaderSection}>
           <View style={styles.dateRow}>
-            <Pressable onPress={() => changeDate(-1)} style={styles.dateArrow}>
+              <Pressable
+                accessibilityLabel="Go to previous day"
+                accessibilityRole="button"
+                onPress={() => changeDate(-1)}
+                style={styles.dateArrow}
+              >
               <Ionicons color={colors.textPrimary} name="chevron-back" size={20} />
             </Pressable>
             <View style={styles.datePill}>
@@ -788,6 +648,8 @@ export default function AddScreen() {
               </View>
             </View>
             <Pressable
+              accessibilityLabel="Go to next day"
+              accessibilityRole="button"
               disabled={!canGoForward}
               onPress={() => changeDate(1)}
               style={[styles.dateArrow, !canGoForward && styles.dateArrowDisabled]}
@@ -797,13 +659,28 @@ export default function AddScreen() {
           </View>
 
           <View style={styles.summaryCard}>
-            <View>
+            <View style={styles.summaryValueWrap}>
               <Text style={styles.summaryLabel}>Selected day total</Text>
               <Text style={styles.summaryValue}>{formatDuration(totalMinutes)}</Text>
             </View>
-            <Text style={styles.summaryMeta}>
-              {selectedEntry?.sessions.length ?? 0} session{(selectedEntry?.sessions.length ?? 0) === 1 ? '' : 's'}
-            </Text>
+            <View style={styles.summaryRingWrap}>
+              <GoalProgressRing
+                colors={colors}
+                goal={settings.dailyGoalMinutes}
+                label={`${Math.round((totalMinutes / settings.dailyGoalMinutes) * 100) || 0}%`}
+                progressColor={totalMinutes >= settings.dailyGoalMinutes ? colors.success : undefined}
+                sublabel="goal"
+                value={totalMinutes}
+              />
+            </View>
+            <View style={styles.summaryMetaWrap}>
+              <Text style={styles.summaryMeta}>
+                {selectedEntry?.sessions.length ?? 0} session{(selectedEntry?.sessions.length ?? 0) === 1 ? '' : 's'}
+              </Text>
+              <Text style={styles.summaryMetaSecondary}>
+                Avg {averageSessionLength ? formatDuration(averageSessionLength) : '—'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -812,120 +689,32 @@ export default function AddScreen() {
           showsVerticalScrollIndicator={false}
           style={styles.timelineScrollView}
         >
-          <View style={styles.timelineCard}>
-            {groupedTimeline.map(({ hour, sessions }) => (
-              <View
-                key={hour}
-                onLayout={(event) => handleTimelineRowLayout(hour, event)}
-                ref={(node) => {
-                  timelineRowRefs.current[hour] = node;
-                }}
-                style={styles.timelineRow}
-              >
-                <View style={styles.timelineLine} />
-                <View style={styles.hourColumn}>
-                  <View
-                    style={[
-                      styles.hourBadge,
-                      (createDraggedHoursSet.has(hour) || moveDraggedHoursSet.has(hour)) && styles.hourBadgeActive,
-                    ]}
-                  >
-                    <View style={styles.hourBadgeContent}>
-                      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.hourMarker}>
-                        {formatHourLabel(hour)}
-                      </Text>
-                      {isCurrentDate && currentHour === hour ? <View style={styles.hourCurrentDot} /> : null}
-                    </View>
-                  </View>
-                </View>
-
-                <View
-                  style={[
-                    styles.timelineContentColumn,
-                    createDraggedHoursSet.has(hour) && styles.timelineContentColumnCreateActive,
-                    moveDraggedHoursSet.has(hour) && styles.timelineContentColumnMoveActive,
-                  ]}
-                >
-                  <View style={styles.timelineHeaderRow}>
-                    {canEditSelectedDate ? (
-                      <View {...getCreateDragHandlers(hour)}>
-                        <Pressable
-                          onPress={() =>
-                            openModal(
-                              hour,
-                              '30',
-                              getSuggestedStartMinute(selectedKey, hour, selectedEntry?.sessions ?? []),
-                            )
-                          }
-                          style={[
-                            styles.hourActionButton,
-                            createDraggedHoursSet.has(hour) && styles.hourActionButtonActive,
-                          ]}
-                        >
-                          <Ionicons color={colors.textPrimary} name="add" size={12} />
-                        </Pressable>
-                      </View>
-                    ) : (
-                      <View style={styles.hourActionSpacer} />
-                    )}
-                  </View>
-                  {sessions.length ? (
-                    <View style={styles.sessionList}>
-                      {sessions.map((session) => (
-                        <View key={session.id} {...getMoveDragHandlers(session)}>
-                          <Pressable
-                            style={[
-                              styles.sessionCard,
-                              moveDragState?.session.id === session.id && styles.sessionCardDragging,
-                            ]}
-                          >
-                            <View style={styles.sessionDot} />
-                            <View style={styles.sessionTextWrap}>
-                              <Text style={styles.sessionTitle}>{session.minutes} min walk</Text>
-                              <Text style={styles.sessionMeta}>
-                                {formatSessionTimeRange(session.createdAt, session.minutes)}
-                              </Text>
-                            </View>
-                            {canEditSelectedDate ? (
-                              <View style={styles.sessionActions}>
-                                <Pressable
-                                  hitSlop={8}
-                                  onPress={(event) => {
-                                    event.stopPropagation();
-                                    openEditModal(session);
-                                  }}
-                                  style={styles.sessionEditButton}
-                                >
-                                  <Ionicons color={colors.textPrimary} name="create-outline" size={16} />
-                                </Pressable>
-                                <Pressable
-                                  hitSlop={8}
-                                  onPress={(event) => {
-                                    event.stopPropagation();
-                                    confirmDeleteSession(session);
-                                  }}
-                                  style={styles.sessionDeleteButton}
-                                >
-                                  <Ionicons color={colors.textPrimary} name="trash-outline" size={16} />
-                                </Pressable>
-                              </View>
-                            ) : null}
-                          </Pressable>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    <View style={styles.emptyHourWrap} />
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
+          <AddTimeline
+            canEditSelectedDate={canEditSelectedDate}
+            colors={colors}
+            createDraggedHoursSet={createDraggedHoursSet}
+            currentHour={currentHour}
+            getCreateDragHandlers={getCreateDragHandlers}
+            getMoveDragHandlers={getMoveDragHandlers}
+            groupedTimeline={groupedTimeline}
+            isCurrentDate={isCurrentDate}
+            moveDraggedHoursSet={moveDraggedHoursSet}
+            moveDragSessionId={moveDragState?.session.id}
+            onConfirmDelete={confirmDeleteSession}
+            onOpenEditModal={openEditModal}
+            onOpenModal={openModal}
+            onRowLayout={handleTimelineRowLayout}
+            selectedSessions={selectedEntry?.sessions ?? []}
+            setRowRef={(hour, node) => {
+              timelineRowRefs.current[hour] = node;
+            }}
+            styles={styles}
+          />
         </ScrollView>
       </View>
 
       {canEditSelectedDate ? (
-        <Pressable onPress={() => openModal()} style={styles.floatingBarWrap}>
+        <Pressable accessibilityLabel="Add walking session" accessibilityRole="button" onPress={() => openModal()} style={styles.floatingBarWrap}>
           <View style={styles.floatingBar}>
             <Ionicons color={colors.textPrimary} name="add" size={22} />
             <Text style={styles.floatingBarText}>Add walking session</Text>
@@ -939,7 +728,7 @@ export default function AddScreen() {
           {undoSessions?.length ? (
             <View style={styles.undoCard}>
               <Text style={styles.undoText}>Session deleted</Text>
-              <Pressable onPress={undoDelete} style={styles.undoButton}>
+              <Pressable accessibilityLabel="Undo delete" accessibilityRole="button" onPress={undoDelete} style={styles.undoButton}>
                 <Text style={styles.undoButtonText}>Undo</Text>
               </Pressable>
             </View>
@@ -947,117 +736,26 @@ export default function AddScreen() {
         </View>
       ) : null}
 
-      <Modal animationType="slide" onRequestClose={closeModal} transparent visible={isModalVisible}>
-        <View style={styles.modalOverlay}>
-          <Pressable onPress={closeModal} style={styles.modalDismissArea} />
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>{editingSession ? 'Edit walking session' : 'Add walking minutes'}</Text>
-            <Text style={styles.modalSubtitle}>
-              {editingSession
-                ? 'Adjust the time or minutes for this walking session.'
-                : 'Enter any positive minutes. Anything over 60 rolls into the next hour automatically.'}
-            </Text>
-
-            {latestWarningToast ? <View style={styles.modalToastWrap}>{renderToastCard(latestWarningToast)}</View> : null}
-
-            <View style={styles.modalCounterCard}>
-              <View style={styles.modalCounterInputRow}>
-                <TextInput
-                  keyboardType="number-pad"
-                  onChangeText={(text) => setDraftMinutes(text.replace(/[^0-9]/g, ''))}
-                  placeholder="0"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.modalCounterInput}
-                  value={draftMinutes}
-                />
-                <Text style={styles.modalCounterUnit}>min</Text>
-              </View>
-              <View style={styles.timePickerRow}>
-                <View style={styles.timePickerField}>
-                  <Text style={styles.timePickerLabel}>Hour</Text>
-                  <View style={styles.timeStepperRow}>
-                    <Pressable hitSlop={8} onPress={() => shiftTargetHour(-1)} style={styles.timeAdjustButton}>
-                      <Ionicons color={colors.textPrimary} name="remove" size={16} />
-                    </Pressable>
-                    <View style={styles.timeAdjustCenter}>
-                      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.timeAdjustLabel}>
-                        {formatHourLabel(targetHour)}
-                      </Text>
-                    </View>
-                    <Pressable hitSlop={8} onPress={() => shiftTargetHour(1)} style={styles.timeAdjustButton}>
-                      <Ionicons color={colors.textPrimary} name="add" size={16} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={styles.timePickerField}>
-                  <Text style={styles.timePickerLabel}>Minute</Text>
-                  <View style={styles.timeStepperRow}>
-                    <Pressable hitSlop={8} onPress={() => shiftTargetMinute(-1)} style={styles.timeAdjustButton}>
-                      <Ionicons color={colors.textPrimary} name="remove" size={16} />
-                    </Pressable>
-                    <View style={styles.timeAdjustCenter}>
-                      <Text style={styles.timeAdjustLabel}>{String(targetMinute).padStart(2, '0')}</Text>
-                    </View>
-                    <Pressable hitSlop={8} onPress={() => shiftTargetMinute(1)} style={styles.timeAdjustButton}>
-                      <Ionicons color={colors.textPrimary} name="add" size={16} />
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-              <Text style={styles.modalCounterMeta}>
-                For {formatReadableDate(selectedDate)} ·{' '}
-                {formatDateKeyTimeRange(selectedKey, targetHour, targetMinute, Math.max(getPositiveMinutes(draftMinutes), 1))}
-              </Text>
-            </View>
-
-            <View style={styles.adjustRow}>
-              {[-5, 5].map((delta) => (
-                <Pressable
-                  key={delta}
-                  onPress={() =>
-                    setDraftMinutes((currentMinutes) =>
-                      String(clampMinutes(getPositiveMinutes(currentMinutes || '0') + delta)),
-                    )
-                  }
-                  style={styles.adjustButton}
-                >
-                  <Text style={styles.adjustButtonText}>{delta > 0 ? `+${delta}` : delta} min</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.quickWrap}>
-              {QUICK_MINUTES.map((value) => {
-                const active = value === getPositiveMinutes(draftMinutes);
-
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => setDraftMinutes(String(value))}
-                    style={[styles.quickChip, active && styles.quickChipActive]}
-                  >
-                    <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>{value} min</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.modalActionRow}>
-              <Pressable onPress={closeModal} style={styles.cancelButton}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={saveMinutes} style={styles.saveButtonWrap}>
-                <LinearGradient colors={[colors.actionSurface, colors.actionSurface]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.saveButton}>
-                  <Ionicons color={colors.textPrimary} name={editingSession ? 'create-outline' : 'checkmark-circle'} size={22} />
-                  <Text style={styles.saveButtonText}>{editingSession ? 'Save changes' : 'Add session'}</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <SessionModal
+        clampMinutes={clampMinutes}
+        colors={colors}
+        draftMinutes={draftMinutes}
+        editingSession={editingSession}
+        getPositiveMinutes={getPositiveMinutes}
+        onChangeDraftMinutes={setDraftMinutes}
+        onClose={closeModal}
+        onSave={saveMinutes}
+        onShiftTargetHour={shiftTargetHour}
+        onShiftTargetMinute={shiftTargetMinute}
+        quickMinutes={QUICK_MINUTES}
+        selectedDate={selectedDate}
+        selectedKey={selectedKey}
+        styles={styles}
+        targetHour={targetHour}
+        targetMinute={targetMinute}
+        visible={isModalVisible}
+        warningToast={latestWarningToast ? renderToastCard(latestWarningToast) : undefined}
+      />
 
       <Modal animationType="fade" onRequestClose={closeDeleteDialog} transparent visible={Boolean(sessionPendingDelete)}>
         <View style={styles.dialogOverlay}>
@@ -1074,10 +772,10 @@ export default function AddScreen() {
             </Text>
 
             <View style={styles.dialogActions}>
-              <Pressable onPress={closeDeleteDialog} style={styles.dialogSecondaryButton}>
+              <Pressable accessibilityRole="button" onPress={closeDeleteDialog} style={styles.dialogSecondaryButton}>
                 <Text style={styles.dialogSecondaryText}>Cancel</Text>
               </Pressable>
-              <Pressable onPress={handleDeleteSession} style={styles.dialogPrimaryButton}>
+              <Pressable accessibilityRole="button" onPress={handleDeleteSession} style={styles.dialogPrimaryButton}>
                 <Text style={styles.dialogPrimaryText}>Delete</Text>
               </Pressable>
             </View>

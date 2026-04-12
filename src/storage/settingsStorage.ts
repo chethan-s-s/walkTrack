@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { DashboardSectionKey, UserSettings, WeekStartDay } from '../types';
-import { DAILY_GOAL_MINUTES, WEEKLY_GOAL_DAYS } from '../constants/goals';
+import {
+  DAILY_GOAL_MINUTES,
+  MONTHLY_GOAL_MINUTES,
+  WEEKLY_GOAL_DAYS,
+  WEEKLY_GOAL_MINUTES,
+} from '../constants/goals';
 
 const SETTINGS_STORAGE_KEY = 'walking-tracker/settings-v1';
 
@@ -16,6 +21,8 @@ export const defaultSettings: UserSettings = {
   weekStart: 'monday',
   dailyGoalMinutes: DAILY_GOAL_MINUTES,
   weeklyGoalDays: WEEKLY_GOAL_DAYS,
+  weeklyGoalMinutes: WEEKLY_GOAL_MINUTES,
+  monthlyGoalMinutes: MONTHLY_GOAL_MINUTES,
   hapticsEnabled: true,
   goalReminderEnabled: true,
   timelineStartHour: 6,
@@ -76,6 +83,14 @@ const normalizeSettings = (value: Partial<UserSettings> | null | undefined): Use
     typeof value?.weeklyGoalDays === 'number' && value.weeklyGoalDays >= 1 && value.weeklyGoalDays <= 7
       ? Math.round(value.weeklyGoalDays)
       : defaultSettings.weeklyGoalDays,
+  weeklyGoalMinutes:
+    typeof value?.weeklyGoalMinutes === 'number' && value.weeklyGoalMinutes >= 30
+      ? Math.round(value.weeklyGoalMinutes)
+      : defaultSettings.weeklyGoalMinutes,
+  monthlyGoalMinutes:
+    typeof value?.monthlyGoalMinutes === 'number' && value.monthlyGoalMinutes >= 60
+      ? Math.round(value.monthlyGoalMinutes)
+      : defaultSettings.monthlyGoalMinutes,
   hapticsEnabled: typeof value?.hapticsEnabled === 'boolean' ? value.hapticsEnabled : defaultSettings.hapticsEnabled,
   goalReminderEnabled:
     typeof value?.goalReminderEnabled === 'boolean'

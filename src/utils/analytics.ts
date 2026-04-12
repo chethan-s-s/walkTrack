@@ -156,7 +156,7 @@ export const getMonthlyHeatmapCalendar = (
 
 export const getFilteredHistoryEntries = (
   entries: WalkingEntry[],
-  filter: 'all' | 'week' | 'month' | 'longest',
+  filter: 'all' | 'week' | 'month' | 'longestSession',
   query: string,
   weekStart: WeekStartDay = 'monday',
 ) => {
@@ -179,8 +179,15 @@ export const getFilteredHistoryEntries = (
     nextEntries = nextEntries.filter((entry) => entry.date.startsWith(monthPrefix));
   }
 
-  if (filter === 'longest') {
-    nextEntries = nextEntries.sort((left, right) => right.totalMinutes - left.totalMinutes);
+  if (filter === 'longestSession') {
+    const longestSessionMinutes = Math.max(
+      ...nextEntries.flatMap((entry) => entry.sessions.map((session) => session.minutes)),
+      0,
+    );
+
+    nextEntries = nextEntries
+      .filter((entry) => entry.sessions.some((session) => session.minutes === longestSessionMinutes))
+      .sort((left, right) => right.date.localeCompare(left.date));
   } else {
     nextEntries = nextEntries.sort((left, right) => right.date.localeCompare(left.date));
   }
@@ -193,4 +200,29 @@ export const getFilteredHistoryEntries = (
     const formattedDate = new Date(entry.date).toLocaleDateString('en-US').toLowerCase();
     return entry.date.includes(trimmedQuery) || formattedDate.includes(trimmedQuery);
   });
+};
+
+export const getCurrentStreak = (entries: WalkingEntry[], dailyGoalMinutes: number) => {
+  const entryMap = new Map(entries.map((entry) => [entry.date, entry.totalMinutes]));
+  let streak = 0;
+  const cursor = new Date();
+
+  while ((entryMap.get(getDateKey(cursor)) ?? 0) >= dailyGoalMinutes) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+};
+
+export const getMilestoneBadge = (entries: WalkingEntry[]) => {
+  const lifetimeMinutes = entries.reduce((total, entry) => total + entry.totalMinutes, 0);
+  const milestones = [
+    { minutes: 5000, title: 'Trailblazer', description: 'You’ve walked 5,000+ minutes.' },
+    { minutes: 2400, title: 'Momentum', description: 'You’ve crossed 40 hours of walking.' },
+    { minutes: 1200, title: 'Steady Walker', description: 'You’ve crossed 20 hours total.' },
+    { minutes: 600, title: 'First Milestone', description: 'You’ve crossed 10 hours total.' },
+  ];
+
+  return milestones.find((milestone) => lifetimeMinutes >= milestone.minutes) ?? null;
 };

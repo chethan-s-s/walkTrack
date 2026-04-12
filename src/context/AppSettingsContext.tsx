@@ -17,6 +17,8 @@ type AppSettingsContextValue = {
   setWeekStart: (value: WeekStartDay) => Promise<void>;
   setDailyGoalMinutes: (value: number) => Promise<void>;
   setWeeklyGoalDays: (value: number) => Promise<void>;
+  setWeeklyGoalMinutes: (value: number) => Promise<void>;
+  setMonthlyGoalMinutes: (value: number) => Promise<void>;
   setHapticsEnabled: (value: boolean) => Promise<void>;
   setGoalReminderEnabled: (value: boolean) => Promise<void>;
   setTimelineStartHour: (value: number) => Promise<void>;
@@ -29,6 +31,8 @@ const AppSettingsContext = createContext<AppSettingsContextValue | undefined>(un
 
 const clampDailyGoalMinutes = (value: number) => Math.max(5, Math.min(600, Math.round(value)));
 const clampWeeklyGoalDays = (value: number) => Math.max(1, Math.min(7, Math.round(value)));
+const clampWeeklyGoalMinutes = (value: number) => Math.max(30, Math.min(2000, Math.round(value)));
+const clampMonthlyGoalMinutes = (value: number) => Math.max(60, Math.min(10000, Math.round(value)));
 const clampHour = (value: number) => ((Math.round(value) % 24) + 24) % 24;
 
 export function AppSettingsProvider({ children }: PropsWithChildren) {
@@ -78,6 +82,26 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
       await updateSettings((currentSettings) => ({
         ...currentSettings,
         weeklyGoalDays: clampWeeklyGoalDays(value),
+      }));
+    },
+    [updateSettings],
+  );
+
+  const setWeeklyGoalMinutes = useCallback(
+    async (value: number) => {
+      await updateSettings((currentSettings) => ({
+        ...currentSettings,
+        weeklyGoalMinutes: clampWeeklyGoalMinutes(value),
+      }));
+    },
+    [updateSettings],
+  );
+
+  const setMonthlyGoalMinutes = useCallback(
+    async (value: number) => {
+      await updateSettings((currentSettings) => ({
+        ...currentSettings,
+        monthlyGoalMinutes: clampMonthlyGoalMinutes(value),
       }));
     },
     [updateSettings],
@@ -174,6 +198,8 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
       setWeekStart,
       setDailyGoalMinutes,
       setWeeklyGoalDays,
+      setWeeklyGoalMinutes,
+      setMonthlyGoalMinutes,
       setHapticsEnabled,
       setGoalReminderEnabled,
       setTimelineStartHour,
@@ -186,10 +212,12 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
       setDailyGoalMinutes,
       setGoalReminderEnabled,
       setHapticsEnabled,
+      setMonthlyGoalMinutes,
       setTimelineEndHour,
       setTimelineStartHour,
       setWeekStart,
       setWeeklyGoalDays,
+      setWeeklyGoalMinutes,
       settings,
       settingsLoading,
       toggleDashboardSectionHidden,

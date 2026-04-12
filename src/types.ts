@@ -22,6 +22,8 @@ export type UserSettings = {
   weekStart: WeekStartDay;
   dailyGoalMinutes: number;
   weeklyGoalDays: number;
+  weeklyGoalMinutes: number;
+  monthlyGoalMinutes: number;
   hapticsEnabled: boolean;
   goalReminderEnabled: boolean;
   timelineStartHour: number;

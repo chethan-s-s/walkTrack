@@ -13,29 +13,21 @@ import { useAppSettings } from '../../context/AppSettingsContext';
 import { useAppColors } from '../../theme/useAppColors';
 import { DashboardSectionKey } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
+import { formatHourLabel, getTimelineSpanHours, isOvernightTimeline } from '../../utils/time';
 import { createStyles } from './MoreScreenStyles';
-
-const formatHourLabel = (hour: number) => {
-  if (hour === 0) {
-    return '12 AM';
-  }
-
-  if (hour < 12) {
-    return `${hour} AM`;
-  }
-
-  if (hour === 12) {
-    return '12 PM';
-  }
-
-  return `${hour - 12} PM`;
-};
 
 const shiftHour = (hour: number, delta: number) => ((hour + delta) % 24 + 24) % 24;
 const MIN_DAILY_GOAL_MINUTES = 5;
 const MAX_DAILY_GOAL_MINUTES = 600;
 const MIN_WEEKLY_GOAL_DAYS = 1;
 const MAX_WEEKLY_GOAL_DAYS = 7;
+
+const TIMELINE_PRESETS = [
+  { label: 'Daytime', start: 6, end: 22 },
+  { label: 'Extended', start: 5, end: 0 },
+  { label: 'Overnight', start: 18, end: 6 },
+  { label: 'Full day', start: 0, end: 23 },
+];
 
 const DASHBOARD_SECTION_DETAILS: Record<DashboardSectionKey, { title: string; description: string }> = {
   insights: {
@@ -77,6 +69,12 @@ export default function MoreScreen() {
   const isDailyGoalMaxed = settings.dailyGoalMinutes >= MAX_DAILY_GOAL_MINUTES;
   const isWeeklyGoalDaysMinned = settings.weeklyGoalDays <= MIN_WEEKLY_GOAL_DAYS;
   const isWeeklyGoalDaysMaxed = settings.weeklyGoalDays >= MAX_WEEKLY_GOAL_DAYS;
+  const visibleTimelineHours = getTimelineSpanHours(settings.timelineStartHour, settings.timelineEndHour);
+  const timelineHelperText = isOvernightTimeline(settings.timelineStartHour, settings.timelineEndHour)
+    ? `Overnight range · ${visibleTimelineHours} visible hour${visibleTimelineHours === 1 ? '' : 's'}`
+    : settings.timelineStartHour === settings.timelineEndHour
+      ? 'Single-hour range · start and end are the same'
+      : `Same-day range · ${visibleTimelineHours} visible hour${visibleTimelineHours === 1 ? '' : 's'}`;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -211,21 +209,56 @@ export default function MoreScreen() {
               <Text style={styles.rowTitle}>Add screen hours</Text>
               <Text style={styles.rowDescription}>Visible hours in the timeline.</Text>
             </View>
+            <Text style={styles.timelineHint}>{timelineHelperText}</Text>
+
+            <View style={styles.timelinePresetRow}>
+              {TIMELINE_PRESETS.map((preset) => {
+                const active =
+                  settings.timelineStartHour === preset.start && settings.timelineEndHour === preset.end;
+
+                return (
+                  <Pressable
+                    key={preset.label}
+                    accessibilityLabel={`Use ${preset.label} timeline preset`}
+                    accessibilityRole="button"
+                    onPress={async () => {
+                      await setTimelineStartHour(preset.start);
+                      await setTimelineEndHour(preset.end);
+                    }}
+                    style={[styles.timelinePresetChip, active && styles.timelinePresetChipActive]}
+                  >
+                    <Text style={[styles.timelinePresetChipText, active && styles.timelinePresetChipTextActive]}>
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
             {[
-              ['Start time', settings.timelineStartHour, setTimelineStartHour],
-              ['End time', settings.timelineEndHour, setTimelineEndHour],
-            ].map(([label, hour, updateHour]) => (
+              { label: 'Start time', hour: settings.timelineStartHour, updateHour: setTimelineStartHour },
+              { label: 'End time', hour: settings.timelineEndHour, updateHour: setTimelineEndHour },
+            ].map(({ label, hour, updateHour }) => (
               <View key={label} style={styles.hourRangeRow}>
                 <Text style={styles.hourRangeLabelInline}>{label}</Text>
                 <View style={styles.stepperControls}>
-                  <Pressable onPress={() => void updateHour(shiftHour(hour as number, -1))} style={styles.stepperButton}>
+                  <Pressable
+                    accessibilityLabel={`Decrease ${String(label).toLowerCase()}`}
+                    accessibilityRole="button"
+                    onPress={() => void updateHour(shiftHour(hour, -1))}
+                    style={styles.stepperButton}
+                  >
                     <Ionicons color={colors.textPrimary} name="remove" size={18} />
                   </Pressable>
                   <View style={styles.hourRangeValueWrap}>
-                    <Text numberOfLines={1} style={styles.stepperValue}>{formatHourLabel(hour as number)}</Text>
+                    <Text numberOfLines={1} style={styles.stepperValue}>{formatHourLabel(hour)}</Text>
                   </View>
-                  <Pressable onPress={() => void updateHour(shiftHour(hour as number, 1))} style={styles.stepperButton}>
+                  <Pressable
+                    accessibilityLabel={`Increase ${String(label).toLowerCase()}`}
+                    accessibilityRole="button"
+                    onPress={() => void updateHour(shiftHour(hour, 1))}
+                    style={styles.stepperButton}
+                  >
                     <Ionicons color={colors.textPrimary} name="add" size={18} />
                   </Pressable>
                 </View>

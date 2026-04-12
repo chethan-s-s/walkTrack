@@ -17,49 +17,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { useWalkingData } from '../../context/WalkingDataContext';
-import { getDateKey } from '../../storage/walkingStorage';
 import { useAppColors } from '../../theme/useAppColors';
 import { getFilteredHistoryEntries } from '../../utils/analytics';
 import { formatDuration } from '../../utils/formatDuration';
+import { formatHistoryDate, formatSessionTimeRange } from '../../utils/time';
 import { createStyles } from './HistoryScreenStyles';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const formatHistoryDate = (value: string) => {
-  if (value === getDateKey()) {
-    return 'Today';
-  }
-
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-};
-
-const formatClockTime = (date: Date) =>
-  date.toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-
-const formatSessionTimeRange = (createdAt: string, durationMinutes: number) => {
-  const start = new Date(createdAt);
-  const end = new Date(start.getTime() + durationMinutes * 60_000);
-
-  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
-};
-
 export default function HistoryScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { settings } = useAppSettings();
   const { entries, loading } = useWalkingData();
-  const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'longest'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'longestSession'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
@@ -150,7 +123,7 @@ export default function HistoryScreen() {
                 ['all', 'All'],
                 ['week', 'This week'],
                 ['month', 'This month'],
-                ['longest', 'Longest day'],
+                ['longestSession', 'Longest session'],
               ].map(([value, label]) => {
                 const active = activeFilter === value;
 
@@ -177,7 +150,7 @@ export default function HistoryScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <Pressable onPress={() => toggleExpanded(item.date)} style={styles.rowCard}>
+          <Pressable accessibilityRole="button" onPress={() => toggleExpanded(item.date)} style={styles.rowCard}>
             <View style={styles.rowTop}>
               <View>
                 <Text style={styles.rowDate}>{formatHistoryDate(item.date)}</Text>

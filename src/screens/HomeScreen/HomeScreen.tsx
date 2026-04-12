@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,6 +16,8 @@ import { useAppColors } from '../../theme/useAppColors';
 import {
   getAverageSessionLength,
   getBestDay,
+  getCurrentStreak,
+  getMilestoneBadge,
   getMonthlyHeatmapCalendar,
   getTotalMinutesThisMonth,
   getWeekDates,
@@ -26,27 +28,12 @@ import { formatDuration } from '../../utils/formatDuration';
 import { createStyles } from './HomeScreenStyles';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { DashboardSectionKey } from '../../types';
+import { formatDashboardDate, formatEntryDate } from '../../utils/time';
 
 const formatDay = (date: Date) =>
   date.toLocaleDateString('en-US', {
     weekday: 'short',
   });
-
-const formatDashboardDate = (date: Date) =>
-  date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-
-const formatEntryDate = (value: string) => {
-  const [year, month, day] = value.split('-').map(Number);
-
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-};
 
 const getHeatColor = (minutes: number, maxMinutes: number, colors: ReturnType<typeof useAppColors>) => {
   if (minutes <= 0) {
@@ -86,6 +73,7 @@ export default function HomeScreen() {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
+  const [heatmapTooltip, setHeatmapTooltip] = useState<{ key: string; id: number } | null>(null);
   const currentMonthStart = useMemo(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -117,6 +105,8 @@ export default function HomeScreen() {
   const averageSessionLength = useMemo(() => getAverageSessionLength(entries), [entries]);
   const totalMinutesThisMonth = useMemo(() => getTotalMinutesThisMonth(entries), [entries]);
   const weeklyTrend = useMemo(() => getWeeklyTrend(entries, settings.weekStart), [entries, settings.weekStart]);
+  const currentStreak = useMemo(() => getCurrentStreak(entries, settings.dailyGoalMinutes), [entries, settings.dailyGoalMinutes]);
+  const milestoneBadge = useMemo(() => getMilestoneBadge(entries), [entries]);
   const heatmapCalendar = useMemo(
     () => getMonthlyHeatmapCalendar(entries, selectedHeatmapMonth, settings.weekStart),
     [entries, selectedHeatmapMonth, settings.weekStart],
@@ -131,6 +121,17 @@ export default function HomeScreen() {
       selectedHeatmapMonth.getMonth() < currentMonthStart.getMonth());
   const remainingGoalMinutes = Math.max(settings.dailyGoalMinutes - todayMinutes, 0);
   const isGoalReached = todayMinutes >= settings.dailyGoalMinutes;
+  useEffect(() => {
+    if (!heatmapTooltip) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      setHeatmapTooltip(null);
+    }, 2000);
+
+    return () => clearTimeout(timeout);
+  }, [heatmapTooltip]);
 
   const changeHeatmapMonth = (direction: -1 | 1) => {
     setSelectedHeatmapMonth((currentMonth) => {
@@ -142,6 +143,7 @@ export default function HomeScreen() {
 
       return nextMonth;
     });
+    setHeatmapTooltip(null);
   };
 
   const dashboardSections = useMemo(() => {
@@ -166,7 +168,13 @@ export default function HomeScreen() {
               <Text style={styles.insightMeta}>Across all sessions</Text>
             </View>
 
-            <View style={styles.insightTileWide}>
+            <View style={styles.insightTile}>
+              <Text style={styles.insightLabel}>This week</Text>
+              <Text style={styles.insightValue}>{formatDuration(weeklyMinutes)}</Text>
+              <Text style={styles.insightMeta}>Total logged this week</Text>
+            </View>
+
+            <View style={styles.insightTile}>
               <Text style={styles.insightLabel}>This month</Text>
               <Text style={styles.insightValue}>{formatDuration(totalMinutesThisMonth)}</Text>
               <Text style={styles.insightMeta}>Total logged this month</Text>
@@ -236,13 +244,15 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.heatmapMonthNav}>
-              <Pressable onPress={() => changeHeatmapMonth(-1)} style={styles.heatmapMonthButton}>
+              <Pressable accessibilityLabel="Show previous month" accessibilityRole="button" onPress={() => changeHeatmapMonth(-1)} style={styles.heatmapMonthButton}>
                 <Ionicons color={colors.textPrimary} name="chevron-back" size={16} />
               </Pressable>
               <View style={styles.heatmapMonthBadge}>
                 <Text style={styles.heatmapMonthText}>{heatmapCalendar.monthLabel}</Text>
               </View>
               <Pressable
+                accessibilityLabel="Show next month"
+                accessibilityRole="button"
                 disabled={!canGoToNextHeatmapMonth}
                 onPress={() => changeHeatmapMonth(1)}
                 style={[styles.heatmapMonthButton, !canGoToNextHeatmapMonth && styles.heatmapMonthButtonDisabled]}
@@ -265,14 +275,23 @@ export default function HomeScreen() {
           <View style={styles.heatmapGrid}>
             {heatmapCalendar.cells.map((day) =>
               day.isCurrentMonth ? (
-                <View
+                <Pressable
+                  accessibilityLabel={`${day.dayNumber} ${heatmapCalendar.monthLabel}, ${formatDuration(day.minutes)} walked`}
+                  accessibilityRole="button"
                   key={day.key}
+                  onPress={() => setHeatmapTooltip({ key: day.key, id: Date.now() })}
                   style={[
                     styles.heatmapCell,
                     { backgroundColor: getHeatColor(day.minutes, heatmapMaxMinutes, colors) },
                     day.isToday && styles.heatmapCellToday,
+                    heatmapTooltip?.key === day.key && styles.heatmapCellSelected,
                   ]}
                 >
+                  {heatmapTooltip?.key === day.key ? (
+                    <View style={styles.heatmapTooltip}>
+                      <Text style={styles.heatmapTooltipText}>{formatDuration(day.minutes)}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.heatmapCellContent}>
                     <Text
                       style={[
@@ -284,7 +303,7 @@ export default function HomeScreen() {
                       {day.dayNumber}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
               ) : (
                 <View key={day.key} style={[styles.heatmapCell, styles.heatmapCellEmpty]} />
               ),
@@ -311,15 +330,20 @@ export default function HomeScreen() {
     averageSessionLength,
     bestDay,
     colors,
+    currentStreak,
     heatmapCalendar,
     heatmapMaxMinutes,
+    milestoneBadge,
     maxMinutes,
     settings.dailyGoalMinutes,
     settings.dashboardOrder,
     settings.hiddenDashboardSections,
     canGoToNextHeatmapMonth,
+    heatmapTooltip,
     totalMinutesThisMonth,
+    weeklyMinutes,
     weeklyBars,
+    weeklyGoalHits,
     weeklyTrend,
     styles,
   ]);
@@ -358,9 +382,19 @@ export default function HomeScreen() {
               </Text>
               <View style={styles.streakPill}>
                 <Text style={styles.streakText}>
-                  {weeklyGoalHits >= settings.weeklyGoalDays ? 'On track' : `${settings.weeklyGoalDays - weeklyGoalHits} more day${settings.weeklyGoalDays - weeklyGoalHits === 1 ? '' : 's'} needed`}
+                  {currentStreak > 0
+                    ? `${currentStreak}-day streak`
+                    : weeklyGoalHits >= settings.weeklyGoalDays
+                      ? 'On track'
+                      : `${settings.weeklyGoalDays - weeklyGoalHits} more day${settings.weeklyGoalDays - weeklyGoalHits === 1 ? '' : 's'} needed`}
                 </Text>
               </View>
+              {milestoneBadge ? (
+                <View style={styles.milestonePill}>
+                  <Text style={styles.milestoneTitle}>{milestoneBadge.title}</Text>
+                  <Text style={styles.milestoneText}>{milestoneBadge.description}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -378,10 +412,12 @@ export default function HomeScreen() {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Today</Text>
             <Text style={styles.cardValue}>{formatDuration(todayMinutes)}</Text>
+            <Text style={styles.cardMeta}>{isGoalReached ? 'Goal reached' : `${formatDuration(remainingGoalMinutes)} left`}</Text>
           </View>
           <View style={styles.card}>
             <Text style={styles.cardLabel}>This week</Text>
             <Text style={styles.cardValue}>{formatDuration(weeklyMinutes)}</Text>
+            <Text style={styles.cardMeta}>{weeklyGoalHits}/7 goal days hit</Text>
           </View>
         </View>
 

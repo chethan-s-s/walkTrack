@@ -172,6 +172,36 @@ export const createStyles = (colors: AppColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    timelineHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    timelinePresetRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    timelinePresetChip: {
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: colors.actionSurface,
+      borderWidth: 1,
+      borderColor: colors.actionBorder,
+    },
+    timelinePresetChipActive: {
+      backgroundColor: colors.textPrimary,
+      borderColor: colors.textPrimary,
+    },
+    timelinePresetChipText: {
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    timelinePresetChipTextActive: {
+      color: colors.background,
+    },
     dashboardRow: {
       backgroundColor: colors.surfaceAlt,
       borderRadius: 20,
