@@ -54,9 +54,9 @@ export default function App() {
               tabBarStyle: {
                 backgroundColor: '#111113',
                 borderTopColor: '#27272a',
-                height: 72,
-                paddingTop: 8,
-                paddingBottom: 10,
+                height: 64,
+                paddingTop: 6,
+                paddingBottom: 8,
               },
               tabBarLabelStyle: {
                 fontSize: 12,
