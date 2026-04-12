@@ -8,9 +8,19 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    flex: 1,
     padding: 20,
-    paddingBottom: 116,
-    gap: 20,
+    paddingBottom: 0,
+    gap: 16,
+  },
+  fixedHeaderSection: {
+    gap: 16,
+  },
+  timelineScrollView: {
+    flex: 1,
+  },
+  timelineScrollContent: {
+    paddingBottom: 120,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -61,16 +71,42 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   datePill: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: 24,
+    borderRadius: 26,
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  datePillTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dateIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.actionSurface,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  dateEyebrow: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   dateLabel: {
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
   },
   dateSubLabel: {
     marginTop: 4,
@@ -107,6 +143,12 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
+  },
+  hourBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   hourBadgeActive: {
     backgroundColor: colors.surfaceMuted,
@@ -145,6 +187,13 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
+    flexShrink: 0,
+  },
+  hourCurrentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
   },
   sessionList: {
     marginTop: 6,
@@ -190,6 +239,16 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flexShrink: 0,
+  },
+  sessionEditButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sessionTimePill: {
     minHeight: 28,
@@ -268,16 +327,19 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   quickWrap: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
+    justifyContent: 'space-between',
   },
   quickChip: {
-    borderRadius: 999,
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.actionBorder,
     paddingVertical: 10,
     paddingHorizontal: 14,
     backgroundColor: colors.actionSurface,
+    alignItems: 'center',
   },
   quickChipActive: {
     backgroundColor: colors.surfaceAlt,
@@ -358,12 +420,13 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  undoWrap: {
+  messageStackWrap: {
     position: 'absolute',
     left: 16,
     right: 16,
     bottom: 78,
     zIndex: 85,
+    gap: 10,
   },
   undoCard: {
     minHeight: 56,
@@ -394,14 +457,6 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
-  },
-  toastWrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 70,
-    zIndex: 80,
-    elevation: 16,
   },
   toastCard: {
     minHeight: 52,
@@ -479,6 +534,40 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     width: '100%',
     gap: 6,
   },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+    marginTop: 10,
+    width: '100%',
+  },
+  timePickerField: {
+    flex: 1,
+    minHeight: 92,
+    borderRadius: 18,
+    backgroundColor: colors.actionSurface,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  timePickerLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  timeStepperRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   timeAdjustRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -505,8 +594,10 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   timeAdjustLabel: {
     color: colors.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
+    textAlign: 'center',
+    width: '100%',
   },
   timeAdjustMeta: {
     color: colors.textMuted,

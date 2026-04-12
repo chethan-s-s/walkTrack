@@ -149,23 +149,28 @@ export const createStyles = (colors: AppColors) =>
       fontSize: 12,
       fontWeight: '600',
     },
-    hourRangeGrid: {
-      gap: 8,
-    },
-    hourRangeCard: {
+    hourRangeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
       backgroundColor: colors.actionSurface,
       borderRadius: 18,
       padding: 10,
       borderWidth: 1,
       borderColor: colors.actionBorder,
-      gap: 6,
     },
-    hourRangeLabel: {
+    hourRangeLabelInline: {
       color: colors.textMuted,
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+    hourRangeValueWrap: {
+      minWidth: 92,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     dashboardRow: {
       backgroundColor: colors.surfaceAlt,

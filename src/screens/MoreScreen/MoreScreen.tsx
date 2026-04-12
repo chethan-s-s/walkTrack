@@ -212,39 +212,25 @@ export default function MoreScreen() {
               <Text style={styles.rowDescription}>Visible hours in the timeline.</Text>
             </View>
 
-            <View style={styles.hourRangeGrid}>
-              <View style={styles.hourRangeCard}>
-                <Text style={styles.hourRangeLabel}>Start</Text>
+            {[
+              ['Start time', settings.timelineStartHour, setTimelineStartHour],
+              ['End time', settings.timelineEndHour, setTimelineEndHour],
+            ].map(([label, hour, updateHour]) => (
+              <View key={label} style={styles.hourRangeRow}>
+                <Text style={styles.hourRangeLabelInline}>{label}</Text>
                 <View style={styles.stepperControls}>
-                  <Pressable onPress={() => void setTimelineStartHour(shiftHour(settings.timelineStartHour, -1))} style={styles.stepperButton}>
+                  <Pressable onPress={() => void updateHour(shiftHour(hour as number, -1))} style={styles.stepperButton}>
                     <Ionicons color={colors.textPrimary} name="remove" size={18} />
                   </Pressable>
-                  <View style={styles.stepperValueWrap}>
-                    <Text style={styles.stepperValue}>{formatHourLabel(settings.timelineStartHour)}</Text>
-                    <Text style={styles.stepperMeta}>timeline start</Text>
+                  <View style={styles.hourRangeValueWrap}>
+                    <Text numberOfLines={1} style={styles.stepperValue}>{formatHourLabel(hour as number)}</Text>
                   </View>
-                  <Pressable onPress={() => void setTimelineStartHour(shiftHour(settings.timelineStartHour, 1))} style={styles.stepperButton}>
+                  <Pressable onPress={() => void updateHour(shiftHour(hour as number, 1))} style={styles.stepperButton}>
                     <Ionicons color={colors.textPrimary} name="add" size={18} />
                   </Pressable>
                 </View>
               </View>
-
-              <View style={styles.hourRangeCard}>
-                <Text style={styles.hourRangeLabel}>End</Text>
-                <View style={styles.stepperControls}>
-                  <Pressable onPress={() => void setTimelineEndHour(shiftHour(settings.timelineEndHour, -1))} style={styles.stepperButton}>
-                    <Ionicons color={colors.textPrimary} name="remove" size={18} />
-                  </Pressable>
-                  <View style={styles.stepperValueWrap}>
-                    <Text style={styles.stepperValue}>{formatHourLabel(settings.timelineEndHour)}</Text>
-                    <Text style={styles.stepperMeta}>timeline end</Text>
-                  </View>
-                  <Pressable onPress={() => void setTimelineEndHour(shiftHour(settings.timelineEndHour, 1))} style={styles.stepperButton}>
-                    <Ionicons color={colors.textPrimary} name="add" size={18} />
-                  </Pressable>
-                </View>
-              </View>
-            </View>
+            ))}
           </View>
           </> : null}
         </View>

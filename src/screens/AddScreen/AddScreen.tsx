@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { getDateKey } from '../../storage/walkingStorage';
 import { useAppColors } from '../../theme/useAppColors';
@@ -21,8 +22,7 @@ import { WalkingSession } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
 import { createStyles } from './AddScreenStyles';
 
-const QUICK_MINUTES = [10, 20, 30];
-const HOUR_ROWS = [...Array.from({ length: 18 }, (_, index) => index + 6), 0];
+const QUICK_MINUTES = [15, 30, 45, 60];
 const DRAG_ACTIVATION_DISTANCE = 8;
 
 type TimelineRowMeasurement = {
@@ -41,7 +41,16 @@ type MoveDragState = {
   currentHour: number;
 };
 
+type ToastMessage = {
+  id: number;
+  message: string;
+  type: 'success' | 'warning';
+};
+
 const clampMinutes = (minutes: number) => Math.max(5, Math.min(240, minutes));
+const normalizeHour = (hour: number) => ((hour % 24) + 24) % 24;
+const normalizeMinute = (minute: number) => ((minute % 60) + 60) % 60;
+const getDefaultTargetMinute = () => new Date().getMinutes();
 
 const getPositiveMinutes = (value: string) => {
   const numericValue = Number.parseInt(value, 10);
@@ -53,42 +62,68 @@ const getPositiveMinutes = (value: string) => {
   return numericValue;
 };
 
-const splitMinutesAcrossHours = (totalMinutes: number, startingHour: number) => {
-  const segments: Array<{ hour: number; minutes: number }> = [];
+const buildSessionSegments = (totalMinutes: number, startingHour: number, startingMinute: number) => {
+  const segments: Array<{ hour: number; minute: number; minutes: number }> = [];
   let remainingMinutes = totalMinutes;
-  let currentHour = startingHour;
+  let currentHour = normalizeHour(startingHour);
+  let currentMinute = normalizeMinute(startingMinute);
 
   while (remainingMinutes > 0) {
-    const segmentMinutes = Math.min(remainingMinutes, 60);
-    segments.push({ hour: currentHour, minutes: segmentMinutes });
+    const availableMinutes = segments.length === 0 ? 60 - currentMinute : 60;
+    const segmentMinutes = Math.min(remainingMinutes, availableMinutes);
+    segments.push({ hour: currentHour, minute: currentMinute, minutes: segmentMinutes });
     remainingMinutes -= segmentMinutes;
-    currentHour = (currentHour + 1) % 24;
+    currentHour = normalizeHour(currentHour + 1);
+    currentMinute = 0;
   }
 
   return segments;
 };
 
-const getHourRange = (startHour: number, endHour: number) => {
-  const startIndex = HOUR_ROWS.indexOf(startHour);
-  const endIndex = HOUR_ROWS.indexOf(endHour);
+const getTimelineHours = (startHour: number, endHour: number) => {
+  const hours: number[] = [];
+  let currentHour = normalizeHour(startHour);
+  const normalizedEndHour = normalizeHour(endHour);
+
+  for (let index = 0; index < 24; index += 1) {
+    hours.push(currentHour);
+
+    if (currentHour === normalizedEndHour) {
+      break;
+    }
+
+    currentHour = normalizeHour(currentHour + 1);
+  }
+
+  return hours;
+};
+
+const getHourRange = (hours: number[], startHour: number, endHour: number) => {
+  const startIndex = hours.indexOf(startHour);
+  const endIndex = hours.indexOf(endHour);
 
   if (startIndex === -1 || endIndex === -1) {
     return [] as number[];
   }
 
   const [rangeStart, rangeEnd] = startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
-  return HOUR_ROWS.slice(rangeStart, rangeEnd + 1);
+  return hours.slice(rangeStart, rangeEnd + 1);
 };
 
-const getHoursForMinutes = (minutes: number, startingHour: number) =>
-  splitMinutesAcrossHours(minutes, startingHour).map((segment) => segment.hour);
+const getHoursForMinutes = (minutes: number, startingHour: number, startingMinute: number) =>
+  buildSessionSegments(minutes, startingHour, startingMinute).map((segment) => segment.hour);
 
-const getOccupiedHours = (sessions: WalkingSession[]) =>
-  new Set(sessions.map((session) => new Date(session.createdAt).getHours()));
+const getYesterdayDate = () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return yesterday;
+};
 
 const formatReadableDate = (date: Date) =>
   getDateKey(date) === getDateKey()
     ? 'Today'
+    : getDateKey(date) === getDateKey(getYesterdayDate())
+      ? 'Yesterday'
     : date.toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'short',
@@ -117,19 +152,96 @@ const formatSessionTime = (createdAt: string) =>
     minute: '2-digit',
   });
 
-const getDefaultTargetHour = () => {
-  const currentHour = new Date().getHours();
+const formatTimeLabel = (hour: number, minute: number) => {
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${normalizedHour}:${String(normalizeMinute(minute)).padStart(2, '0')} ${suffix}`;
+};
 
-  if (currentHour < 6) {
-    return 6;
+const formatClockTime = (date: Date) =>
+  date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+const formatSessionTimeRange = (createdAt: string, durationMinutes: number) => {
+  const start = new Date(createdAt);
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
+};
+
+const getTimestampForDateTime = (dateKey: string, hour: number, minute: number) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day, normalizeHour(hour), normalizeMinute(minute), 0, 0);
+};
+
+const formatDateKeyTimeRange = (dateKey: string, hour: number, minute: number, durationMinutes: number) => {
+  const start = getTimestampForDateTime(dateKey, hour, minute);
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
+};
+
+const getSuggestedStartMinute = (dateKey: string, hour: number, sessions: WalkingSession[]) => {
+  const normalizedHour = normalizeHour(hour);
+  const sessionsInHour = sessions
+    .filter((session) => {
+      const start = new Date(session.createdAt);
+      return start.getHours() === normalizedHour;
+    })
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+
+  if (!sessionsInHour.length) {
+    return 0;
   }
 
-  return currentHour;
+  const lastSession = sessionsInHour[sessionsInHour.length - 1];
+  const lastSessionEnd = new Date(new Date(lastSession.createdAt).getTime() + lastSession.minutes * 60_000);
+
+  if (lastSessionEnd.getHours() !== normalizedHour) {
+    return 0;
+  }
+
+  return lastSessionEnd.getMinutes();
+};
+
+const doesTimeRangeCollide = (
+  dateKey: string,
+  sessions: WalkingSession[],
+  nextSegments: Array<{ hour: number; minute: number; minutes: number }>,
+  excludedSessionIds: string[] = [],
+) => {
+  const excludedIds = new Set(excludedSessionIds);
+
+  return nextSegments.some((segment) => {
+    const nextStart = getTimestampForDateTime(dateKey, segment.hour, segment.minute);
+    const nextEnd = new Date(nextStart.getTime() + segment.minutes * 60_000);
+
+    return sessions
+      .filter((session) => !excludedIds.has(session.id))
+      .some((session) => {
+        const existingStart = new Date(session.createdAt);
+        const existingEnd = new Date(existingStart.getTime() + session.minutes * 60_000);
+        return nextStart < existingEnd && nextEnd > existingStart;
+      });
+  });
+};
+
+const getDefaultTargetHour = (visibleHours: number[]) => {
+  const currentHour = new Date().getHours();
+
+  if (visibleHours.includes(currentHour)) {
+    return currentHour;
+  }
+
+  return visibleHours[0] ?? 6;
 };
 
 export default function AddScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { settings } = useAppSettings();
   const {
     deleteWalkingSession,
     getEntryForDate,
@@ -137,34 +249,47 @@ export default function AddScreen() {
     saveWalkingSession,
     updateWalkingSession,
   } = useWalkingData();
+  const visibleHours = useMemo(
+    () => getTimelineHours(settings.timelineStartHour, settings.timelineEndHour),
+    [settings.timelineEndHour, settings.timelineStartHour],
+  );
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [draftMinutes, setDraftMinutes] = useState('30');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [sessionPendingDelete, setSessionPendingDelete] = useState<WalkingSession | null>(null);
   const [editingSession, setEditingSession] = useState<WalkingSession | null>(null);
   const [undoSessions, setUndoSessions] = useState<WalkingSession[] | null>(null);
-  const [targetHour, setTargetHour] = useState(getDefaultTargetHour());
-  const [toastState, setToastState] = useState<{
-    message: string;
-    type: 'success' | 'warning';
-  } | null>(null);
+  const [targetHour, setTargetHour] = useState(() => getDefaultTargetHour(visibleHours));
+  const [targetMinute, setTargetMinute] = useState(getDefaultTargetMinute());
+  const [toastItems, setToastItems] = useState<ToastMessage[]>([]);
   const [rowMeasurements, setRowMeasurements] = useState<Record<number, TimelineRowMeasurement>>({});
   const [createDragState, setCreateDragState] = useState<CreateDragState | null>(null);
   const [moveDragState, setMoveDragState] = useState<MoveDragState | null>(null);
   const timelineRowRefs = useRef<Record<number, View | null>>({});
   const createDragRef = useRef<CreateDragState | null>(null);
   const moveDragRef = useRef<MoveDragState | null>(null);
+  const toastIdRef = useRef(0);
 
   const selectedKey = useMemo(() => getDateKey(selectedDate), [selectedDate]);
   const isCurrentDate = selectedKey === getDateKey();
+  const currentHour = new Date().getHours();
   const canEditSelectedDate = selectedKey <= getDateKey();
   const canGoForward = !isCurrentDate;
   const selectedEntry = getEntryForDate(selectedKey);
   const totalMinutes = selectedEntry?.totalMinutes ?? 0;
-  const occupiedHours = useMemo(
-    () => getOccupiedHours(selectedEntry?.sessions ?? []),
-    [selectedEntry?.sessions],
-  );
+  const pendingDeleteSessions = useMemo(() => {
+    if (!sessionPendingDelete) {
+      return [] as WalkingSession[];
+    }
+
+    return (selectedEntry?.sessions ?? []).filter((session) => {
+      if (sessionPendingDelete.batchId) {
+        return session.batchId === sessionPendingDelete.batchId;
+      }
+
+      return session.id === sessionPendingDelete.id;
+    });
+  }, [selectedEntry?.sessions, sessionPendingDelete]);
 
   const groupedTimeline = useMemo(() => {
     const groups = new Map<number, WalkingSession[]>();
@@ -175,11 +300,13 @@ export default function AddScreen() {
       groups.set(hour, [...existingSessions, session]);
     });
 
-    return HOUR_ROWS.map((hour) => ({
+    return visibleHours.map((hour) => ({
       hour,
-      sessions: groups.get(hour) ?? [],
+      sessions: [...(groups.get(hour) ?? [])].sort(
+        (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+      ),
     }));
-  }, [selectedEntry]);
+  }, [selectedEntry, visibleHours]);
 
   const setCreateDrag = (nextDragState: CreateDragState | null) => {
     createDragRef.current = nextDragState;
@@ -192,27 +319,22 @@ export default function AddScreen() {
   };
 
   const createDraggedHours = useMemo(
-    () => (createDragState ? getHourRange(createDragState.startHour, createDragState.currentHour) : []),
-    [createDragState],
+    () => (createDragState ? getHourRange(visibleHours, createDragState.startHour, createDragState.currentHour) : []),
+    [createDragState, visibleHours],
   );
   const moveDraggedHours = useMemo(
-    () => (moveDragState ? getHoursForMinutes(moveDragState.session.minutes, moveDragState.currentHour) : []),
+    () =>
+      moveDragState
+        ? getHoursForMinutes(
+            moveDragState.session.minutes,
+            moveDragState.currentHour,
+            new Date(moveDragState.session.createdAt).getMinutes(),
+          )
+        : [],
     [moveDragState],
   );
   const createDraggedHoursSet = useMemo(() => new Set(createDraggedHours), [createDraggedHours]);
   const moveDraggedHoursSet = useMemo(() => new Set(moveDraggedHours), [moveDraggedHours]);
-
-  useEffect(() => {
-    if (!toastState) {
-      return undefined;
-    }
-
-    const timeout = setTimeout(() => {
-      setToastState(null);
-    }, 2200);
-
-    return () => clearTimeout(timeout);
-  }, [toastState]);
 
   useEffect(() => {
     if (!undoSessions?.length) {
@@ -230,7 +352,45 @@ export default function AddScreen() {
     setCreateDrag(null);
     setMoveDrag(null);
     setRowMeasurements({});
-  }, [selectedKey]);
+  }, [selectedKey, visibleHours]);
+
+  useEffect(() => {
+    if (!visibleHours.includes(targetHour)) {
+      setTargetHour(getDefaultTargetHour(visibleHours));
+    }
+  }, [targetHour, visibleHours]);
+
+  const latestWarningToast = useMemo(
+    () => [...toastItems].reverse().find((toastItem) => toastItem.type === 'warning') ?? null,
+    [toastItems],
+  );
+
+  const pushToast = (message: string, type: 'success' | 'warning') => {
+    const nextToastId = toastIdRef.current + 1;
+    toastIdRef.current = nextToastId;
+
+    setToastItems((currentToasts) => [...currentToasts, { id: nextToastId, message, type }]);
+
+    setTimeout(() => {
+      setToastItems((currentToasts) => currentToasts.filter((toastItem) => toastItem.id !== nextToastId));
+    }, 2200);
+  };
+
+  const triggerSelectionHaptic = () => {
+    if (!settings.hapticsEnabled) {
+      return;
+    }
+
+    void Haptics.selectionAsync();
+  };
+
+  const triggerNotificationHaptic = async (type: Haptics.NotificationFeedbackType) => {
+    if (!settings.hapticsEnabled) {
+      return;
+    }
+
+    await Haptics.notificationAsync(type);
+  };
 
   const updateRowMeasurement = (hour: number, pageY: number, height: number) => {
     setRowMeasurements((currentMeasurements) => {
@@ -266,7 +426,7 @@ export default function AddScreen() {
   };
 
   const getHourFromPageY = (pageY: number) => {
-    const measuredRows = HOUR_ROWS.flatMap((hour) => {
+    const measuredRows = visibleHours.flatMap((hour) => {
       const measurement = rowMeasurements[hour];
 
       if (!measurement) {
@@ -296,11 +456,8 @@ export default function AddScreen() {
   };
 
   const showWarningToast = async (message: string) => {
-    setToastState({
-      message,
-      type: 'warning',
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    pushToast(message, 'warning');
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
   };
 
   const updateCreateDragHour = (pageY: number) => {
@@ -315,7 +472,7 @@ export default function AddScreen() {
       ...activeDrag,
       currentHour: nextHour,
     });
-    void Haptics.selectionAsync();
+    triggerSelectionHaptic();
   };
 
   const updateMoveDragHour = (pageY: number) => {
@@ -330,7 +487,7 @@ export default function AddScreen() {
       ...activeDrag,
       currentHour: nextHour,
     });
-    void Haptics.selectionAsync();
+    triggerSelectionHaptic();
   };
 
   const changeDate = (direction: -1 | 1) => {
@@ -345,14 +502,14 @@ export default function AddScreen() {
     });
   };
 
-  const openModal = (hour = getDefaultTargetHour(), minutes = '30') => {
+  const openModal = (hour = getDefaultTargetHour(visibleHours), minutes = '30', minute = getDefaultTargetMinute()) => {
     if (!canEditSelectedDate) {
       return;
     }
 
-    setToastState(null);
     setEditingSession(null);
-    setTargetHour(hour);
+    setTargetHour(visibleHours.includes(normalizeHour(hour)) ? normalizeHour(hour) : getDefaultTargetHour(visibleHours));
+    setTargetMinute(normalizeMinute(minute));
     setDraftMinutes(minutes);
     setIsModalVisible(true);
   };
@@ -362,21 +519,36 @@ export default function AddScreen() {
       return;
     }
 
-    setToastState(null);
     setEditingSession(session);
     setTargetHour(new Date(session.createdAt).getHours());
+    setTargetMinute(new Date(session.createdAt).getMinutes());
     setDraftMinutes(String(session.minutes));
     setIsModalVisible(true);
   };
 
   const closeModal = () => {
-    setToastState(null);
     setEditingSession(null);
     setIsModalVisible(false);
   };
 
   const shiftTargetHour = (delta: -1 | 1) => {
-    setTargetHour((currentHour) => (currentHour + delta + 24) % 24);
+    setTargetHour((currentValue) => normalizeHour(currentValue + delta));
+  };
+
+  const shiftTargetMinute = (delta: -1 | 1) => {
+    setTargetMinute((currentValue) => {
+      const nextMinute = currentValue + delta;
+
+      if (nextMinute < 0) {
+        setTargetHour((currentValueHour) => normalizeHour(currentValueHour - 1));
+      }
+
+      if (nextMinute > 59) {
+        setTargetHour((currentValueHour) => normalizeHour(currentValueHour + 1));
+      }
+
+      return normalizeMinute(nextMinute);
+    });
   };
 
   const finalizeCreateDrag = async () => {
@@ -387,22 +559,24 @@ export default function AddScreen() {
       return;
     }
 
-    const selectedHours = getHourRange(activeDrag.startHour, activeDrag.currentHour);
+    const selectedHours = getHourRange(visibleHours, activeDrag.startHour, activeDrag.currentHour);
 
     if (!selectedHours.length) {
-      openModal(activeDrag.startHour);
+      openModal(activeDrag.startHour, '30', 0);
       return;
     }
 
-    const hasOverlap = selectedHours.some((hour) => occupiedHours.has(hour));
+    const startMinute = getSuggestedStartMinute(selectedKey, selectedHours[0], selectedEntry?.sessions ?? []);
+    const nextSegments = buildSessionSegments(selectedHours.length * 60, selectedHours[0], startMinute);
+    const hasOverlap = doesTimeRangeCollide(selectedKey, selectedEntry?.sessions ?? [], nextSegments);
 
     if (hasOverlap) {
       await showWarningToast('A walking session already exists in one or more of those hourly slots.');
       return;
     }
 
-    openModal(selectedHours[0], String(selectedHours.length * 60));
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    openModal(selectedHours[0], String(selectedHours.length * 60), startMinute);
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
   };
 
   const finalizeMoveDrag = async () => {
@@ -417,13 +591,18 @@ export default function AddScreen() {
       return;
     }
 
-    const targetHours = getHoursForMinutes(activeDrag.session.minutes, activeDrag.currentHour);
-    const occupiedHoursForValidation = new Set(
-      (selectedEntry?.sessions ?? [])
-        .filter((session) => session.id !== activeDrag.session.id)
-        .map((session) => new Date(session.createdAt).getHours()),
+    const sessionMinute = new Date(activeDrag.session.createdAt).getMinutes();
+    const nextSegments = buildSessionSegments(
+      activeDrag.session.minutes,
+      activeDrag.currentHour,
+      sessionMinute,
     );
-    const hasOverlap = targetHours.some((hour) => occupiedHoursForValidation.has(hour));
+    const hasOverlap = doesTimeRangeCollide(
+      selectedKey,
+      selectedEntry?.sessions ?? [],
+      nextSegments,
+      [activeDrag.session.id],
+    );
 
     if (hasOverlap) {
       await showWarningToast('A walking session already exists in one or more of those hourly slots.');
@@ -436,12 +615,10 @@ export default function AddScreen() {
       selectedKey,
       activeDrag.session.minutes,
       activeDrag.currentHour,
+      sessionMinute,
     );
-    setToastState({
-      message: `Moved to ${formatHourLabel(activeDrag.currentHour)}.`,
-      type: 'success',
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    pushToast(`Moved to ${formatTimeLabel(activeDrag.currentHour, sessionMinute)}.`, 'success');
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
   };
 
   const getCreateDragHandlers = (hour: number) =>
@@ -450,12 +627,11 @@ export default function AddScreen() {
           onMoveShouldSetPanResponder: (_event, gestureState) =>
             Math.abs(gestureState.dy) > DRAG_ACTIVATION_DISTANCE,
           onPanResponderGrant: (_event, gestureState) => {
-            setToastState(null);
             setCreateDrag({
               startHour: hour,
               currentHour: getHourFromPageY(gestureState.moveY) ?? hour,
             });
-            void Haptics.selectionAsync();
+            triggerSelectionHaptic();
           },
           onPanResponderMove: (_event, gestureState) => {
             updateCreateDragHour(gestureState.moveY);
@@ -477,13 +653,12 @@ export default function AddScreen() {
           onPanResponderGrant: (_event, gestureState) => {
             const originHour = new Date(session.createdAt).getHours();
 
-            setToastState(null);
             setMoveDrag({
               session,
               originHour,
               currentHour: getHourFromPageY(gestureState.moveY) ?? originHour,
             });
-            void Haptics.selectionAsync();
+            triggerSelectionHaptic();
           },
           onPanResponderMove: (_event, gestureState) => {
             updateMoveDragHour(gestureState.moveY);
@@ -521,11 +696,8 @@ export default function AddScreen() {
     await deleteWalkingSession(selectedKey, sessionPendingDelete);
     setSessionPendingDelete(null);
     setUndoSessions(deletedSessions);
-    setToastState({
-      message: 'Walking session deleted.',
-      type: 'success',
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    pushToast('Walking session deleted.', 'success');
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
   };
 
   const undoDelete = async () => {
@@ -535,22 +707,19 @@ export default function AddScreen() {
 
     await restoreWalkingSessions(undoSessions);
     setUndoSessions(null);
-    setToastState({
-      message: 'Walking session restored.',
-      type: 'success',
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    pushToast('Walking session restored.', 'success');
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
   };
 
-  const renderToastCard = () =>
-    toastState ? (
-      <View style={[styles.toastCard, toastState.type === 'warning' && styles.toastCardWarning]}>
+  const renderToastCard = (toastItem: ToastMessage) =>
+    toastItem ? (
+      <View key={toastItem.id} style={[styles.toastCard, toastItem.type === 'warning' && styles.toastCardWarning]}>
         <Ionicons
           color={colors.textPrimary}
-          name={toastState.type === 'warning' ? 'alert-circle-outline' : 'checkmark-circle'}
+          name={toastItem.type === 'warning' ? 'alert-circle-outline' : 'checkmark-circle'}
           size={18}
         />
-        <Text style={styles.toastText}>{toastState.message}</Text>
+        <Text style={styles.toastText}>{toastItem.message}</Text>
       </View>
     ) : null;
 
@@ -562,182 +731,198 @@ export default function AddScreen() {
     const parsedMinutes = getPositiveMinutes(draftMinutes);
 
     if (parsedMinutes < 1) {
-      setToastState({
-        message: 'Please enter a positive number of walking minutes.',
-        type: 'warning',
-      });
+      pushToast('Please enter a positive number of walking minutes.', 'warning');
       return;
     }
 
-    const occupiedHoursForValidation = new Set(
-      (selectedEntry?.sessions ?? [])
-        .filter((session) => session.id !== editingSession?.id)
-        .map((session) => new Date(session.createdAt).getHours()),
+    const nextSegments = buildSessionSegments(parsedMinutes, targetHour, targetMinute);
+    const hasOverlap = doesTimeRangeCollide(
+      selectedKey,
+      selectedEntry?.sessions ?? [],
+      nextSegments,
+      editingSession ? [editingSession.id] : [],
     );
-    const hourSegments = splitMinutesAcrossHours(parsedMinutes, targetHour);
-    const hasOverlap = hourSegments.some((segment) => occupiedHoursForValidation.has(segment.hour));
 
     if (hasOverlap) {
-      setToastState({
-        message: 'A walking session already exists in one or more of those hourly slots.',
-        type: 'warning',
-      });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      pushToast('A walking session already exists in one or more of those hourly slots.', 'warning');
+      await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
     if (editingSession) {
-      await updateWalkingSession(selectedKey, editingSession.id, selectedKey, parsedMinutes, targetHour);
+      await updateWalkingSession(selectedKey, editingSession.id, selectedKey, parsedMinutes, targetHour, targetMinute);
       closeModal();
-      setToastState({
-        message: `Updated to ${parsedMinutes} min at ${formatHourLabel(targetHour)}.`,
-        type: 'success',
-      });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      pushToast(`Updated ${formatDateKeyTimeRange(selectedKey, targetHour, targetMinute, parsedMinutes)}.`, 'success');
+      await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
       return;
     }
 
     const batchId = `${selectedKey}-${targetHour}-${Date.now()}`;
 
-    for (const segment of hourSegments) {
-      await saveWalkingSession(selectedKey, segment.minutes, segment.hour, 0, batchId);
+    for (const segment of nextSegments) {
+      await saveWalkingSession(selectedKey, segment.minutes, segment.hour, segment.minute, batchId);
     }
 
     closeModal();
-    setToastState({
-      message: `Added ${parsedMinutes} min starting at ${formatHourLabel(targetHour)}.`,
-      type: 'success',
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    pushToast(`Added ${formatDateKeyTimeRange(selectedKey, targetHour, targetMinute, parsedMinutes)}.`, 'success');
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.dateRow}>
-          <Pressable onPress={() => changeDate(-1)} style={styles.dateArrow}>
-            <Ionicons color={colors.textPrimary} name="chevron-back" size={20} />
-          </Pressable>
-          <View style={styles.datePill}>
-            <Text style={styles.dateLabel}>{formatReadableDate(selectedDate)}</Text>
-            <Text style={styles.dateSubLabel}>{selectedKey}</Text>
-          </View>
-          <Pressable
-            disabled={!canGoForward}
-            onPress={() => changeDate(1)}
-            style={[styles.dateArrow, !canGoForward && styles.dateArrowDisabled]}
-          >
-            <Ionicons color={canGoForward ? colors.textPrimary : colors.textMuted} name="chevron-forward" size={20} />
-          </Pressable>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <View>
-            <Text style={styles.summaryLabel}>Selected day total</Text>
-            <Text style={styles.summaryValue}>{formatDuration(totalMinutes)}</Text>
-          </View>
-          <Text style={styles.summaryMeta}>
-            {selectedEntry?.sessions.length ?? 0} session{(selectedEntry?.sessions.length ?? 0) === 1 ? '' : 's'}
-          </Text>
-        </View>
-
-        <View style={styles.timelineCard}>
-          {groupedTimeline.map(({ hour, sessions }) => (
-            <View
-              key={hour}
-              onLayout={(event) => handleTimelineRowLayout(hour, event)}
-              ref={(node) => {
-                timelineRowRefs.current[hour] = node;
-              }}
-              style={styles.timelineRow}
-            >
-              <View style={styles.timelineLine} />
-              <View style={styles.hourColumn}>
-                <View
-                  style={[
-                    styles.hourBadge,
-                    (createDraggedHoursSet.has(hour) || moveDraggedHoursSet.has(hour)) && styles.hourBadgeActive,
-                  ]}
-                >
-                  <Text adjustsFontSizeToFit numberOfLines={1} style={styles.hourMarker}>
-                    {formatHourLabel(hour)}
-                  </Text>
+      <View style={styles.content}>
+        <View style={styles.fixedHeaderSection}>
+          <View style={styles.dateRow}>
+            <Pressable onPress={() => changeDate(-1)} style={styles.dateArrow}>
+              <Ionicons color={colors.textPrimary} name="chevron-back" size={20} />
+            </Pressable>
+            <View style={styles.datePill}>
+              <View style={styles.datePillTopRow}>
+                <View style={styles.dateIconWrap}>
+                  <Ionicons color={colors.textPrimary} name="calendar-clear-outline" size={18} />
                 </View>
-              </View>
-
-              <View
-                style={[
-                  styles.timelineContentColumn,
-                  createDraggedHoursSet.has(hour) && styles.timelineContentColumnCreateActive,
-                  moveDraggedHoursSet.has(hour) && styles.timelineContentColumnMoveActive,
-                ]}
-              >
-                <View style={styles.timelineHeaderRow}>
-                  {canEditSelectedDate ? (
-                    <View {...getCreateDragHandlers(hour)}>
-                      <Pressable
-                        onPress={() => openModal(hour)}
-                        style={[
-                          styles.hourActionButton,
-                          createDraggedHoursSet.has(hour) && styles.hourActionButtonActive,
-                        ]}
-                      >
-                        <Ionicons color={colors.textPrimary} name="add" size={12} />
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <View style={styles.hourActionSpacer} />
-                  )}
+                <View style={styles.dateTextWrap}>
+                  <Text style={styles.dateEyebrow}>Walking day</Text>
+                  <Text style={styles.dateLabel}>{formatReadableDate(selectedDate)}</Text>
                 </View>
-                {sessions.length ? (
-                  <View style={styles.sessionList}>
-                    {sessions.map((session) => (
-                      <View key={session.id} {...getMoveDragHandlers(session)}>
-                        <Pressable
-                          onPress={() => openEditModal(session)}
-                          style={[
-                            styles.sessionCard,
-                            moveDragState?.session.id === session.id && styles.sessionCardDragging,
-                          ]}
-                        >
-                          <View style={styles.sessionDot} />
-                          <View style={styles.sessionTextWrap}>
-                            <Text style={styles.sessionTitle}>{session.minutes} min walk</Text>
-                            <Text style={styles.sessionMeta}>{formatSessionTime(session.createdAt)}</Text>
-                          </View>
-                          {canEditSelectedDate ? (
-                            <View style={styles.sessionActions}>
-                              <View style={styles.sessionTimePill}>
-                                <Text style={styles.sessionTimePillText}>{formatSessionTime(session.createdAt)}</Text>
-                              </View>
-                              <Pressable
-                                hitSlop={8}
-                                onPress={(event) => {
-                                  event.stopPropagation();
-                                  confirmDeleteSession(session);
-                                }}
-                                style={styles.sessionDeleteButton}
-                              >
-                                <Ionicons color={colors.textPrimary} name="trash-outline" size={16} />
-                              </Pressable>
-                            </View>
-                          ) : (
-                            <View style={styles.sessionTimePill}>
-                              <Text style={styles.sessionTimePillText}>{formatSessionTime(session.createdAt)}</Text>
-                            </View>
-                          )}
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.emptyHourWrap} />
-                )}
               </View>
             </View>
-          ))}
+            <Pressable
+              disabled={!canGoForward}
+              onPress={() => changeDate(1)}
+              style={[styles.dateArrow, !canGoForward && styles.dateArrowDisabled]}
+            >
+              <Ionicons color={canGoForward ? colors.textPrimary : colors.textMuted} name="chevron-forward" size={20} />
+            </Pressable>
+          </View>
+
+          <View style={styles.summaryCard}>
+            <View>
+              <Text style={styles.summaryLabel}>Selected day total</Text>
+              <Text style={styles.summaryValue}>{formatDuration(totalMinutes)}</Text>
+            </View>
+            <Text style={styles.summaryMeta}>
+              {selectedEntry?.sessions.length ?? 0} session{(selectedEntry?.sessions.length ?? 0) === 1 ? '' : 's'}
+            </Text>
+          </View>
         </View>
-      </ScrollView>
+
+        <ScrollView
+          contentContainerStyle={styles.timelineScrollContent}
+          showsVerticalScrollIndicator={false}
+          style={styles.timelineScrollView}
+        >
+          <View style={styles.timelineCard}>
+            {groupedTimeline.map(({ hour, sessions }) => (
+              <View
+                key={hour}
+                onLayout={(event) => handleTimelineRowLayout(hour, event)}
+                ref={(node) => {
+                  timelineRowRefs.current[hour] = node;
+                }}
+                style={styles.timelineRow}
+              >
+                <View style={styles.timelineLine} />
+                <View style={styles.hourColumn}>
+                  <View
+                    style={[
+                      styles.hourBadge,
+                      (createDraggedHoursSet.has(hour) || moveDraggedHoursSet.has(hour)) && styles.hourBadgeActive,
+                    ]}
+                  >
+                    <View style={styles.hourBadgeContent}>
+                      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.hourMarker}>
+                        {formatHourLabel(hour)}
+                      </Text>
+                      {isCurrentDate && currentHour === hour ? <View style={styles.hourCurrentDot} /> : null}
+                    </View>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.timelineContentColumn,
+                    createDraggedHoursSet.has(hour) && styles.timelineContentColumnCreateActive,
+                    moveDraggedHoursSet.has(hour) && styles.timelineContentColumnMoveActive,
+                  ]}
+                >
+                  <View style={styles.timelineHeaderRow}>
+                    {canEditSelectedDate ? (
+                      <View {...getCreateDragHandlers(hour)}>
+                        <Pressable
+                          onPress={() =>
+                            openModal(
+                              hour,
+                              '30',
+                              getSuggestedStartMinute(selectedKey, hour, selectedEntry?.sessions ?? []),
+                            )
+                          }
+                          style={[
+                            styles.hourActionButton,
+                            createDraggedHoursSet.has(hour) && styles.hourActionButtonActive,
+                          ]}
+                        >
+                          <Ionicons color={colors.textPrimary} name="add" size={12} />
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={styles.hourActionSpacer} />
+                    )}
+                  </View>
+                  {sessions.length ? (
+                    <View style={styles.sessionList}>
+                      {sessions.map((session) => (
+                        <View key={session.id} {...getMoveDragHandlers(session)}>
+                          <Pressable
+                            style={[
+                              styles.sessionCard,
+                              moveDragState?.session.id === session.id && styles.sessionCardDragging,
+                            ]}
+                          >
+                            <View style={styles.sessionDot} />
+                            <View style={styles.sessionTextWrap}>
+                              <Text style={styles.sessionTitle}>{session.minutes} min walk</Text>
+                              <Text style={styles.sessionMeta}>
+                                {formatSessionTimeRange(session.createdAt, session.minutes)}
+                              </Text>
+                            </View>
+                            {canEditSelectedDate ? (
+                              <View style={styles.sessionActions}>
+                                <Pressable
+                                  hitSlop={8}
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    openEditModal(session);
+                                  }}
+                                  style={styles.sessionEditButton}
+                                >
+                                  <Ionicons color={colors.textPrimary} name="create-outline" size={16} />
+                                </Pressable>
+                                <Pressable
+                                  hitSlop={8}
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    confirmDeleteSession(session);
+                                  }}
+                                  style={styles.sessionDeleteButton}
+                                >
+                                  <Ionicons color={colors.textPrimary} name="trash-outline" size={16} />
+                                </Pressable>
+                              </View>
+                            ) : null}
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyHourWrap} />
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
 
       {canEditSelectedDate ? (
         <Pressable onPress={() => openModal()} style={styles.floatingBarWrap}>
@@ -748,20 +933,17 @@ export default function AddScreen() {
         </Pressable>
       ) : null}
 
-      {toastState && !isModalVisible ? (
-        <View pointerEvents="none" style={styles.toastWrap}>
-          {renderToastCard()}
-        </View>
-      ) : null}
-
-      {undoSessions?.length ? (
-        <View style={styles.undoWrap}>
-          <View style={styles.undoCard}>
-            <Text style={styles.undoText}>Session deleted</Text>
-            <Pressable onPress={undoDelete} style={styles.undoButton}>
-              <Text style={styles.undoButtonText}>Undo</Text>
-            </Pressable>
-          </View>
+      {!isModalVisible && (toastItems.length || undoSessions?.length) ? (
+        <View pointerEvents="box-none" style={styles.messageStackWrap}>
+          {[...toastItems].reverse().map((toastItem) => renderToastCard(toastItem))}
+          {undoSessions?.length ? (
+            <View style={styles.undoCard}>
+              <Text style={styles.undoText}>Session deleted</Text>
+              <Pressable onPress={undoDelete} style={styles.undoButton}>
+                <Text style={styles.undoButtonText}>Undo</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -777,7 +959,7 @@ export default function AddScreen() {
                 : 'Enter any positive minutes. Anything over 60 rolls into the next hour automatically.'}
             </Text>
 
-            {toastState?.type === 'warning' ? <View style={styles.modalToastWrap}>{renderToastCard()}</View> : null}
+            {latestWarningToast ? <View style={styles.modalToastWrap}>{renderToastCard(latestWarningToast)}</View> : null}
 
             <View style={styles.modalCounterCard}>
               <View style={styles.modalCounterInputRow}>
@@ -791,19 +973,43 @@ export default function AddScreen() {
                 />
                 <Text style={styles.modalCounterUnit}>min</Text>
               </View>
-              <View style={styles.timeAdjustRow}>
-                <Pressable hitSlop={8} onPress={() => shiftTargetHour(-1)} style={styles.timeAdjustButton}>
-                  <Ionicons color={colors.textPrimary} name="remove" size={16} />
-                </Pressable>
-                <View style={styles.timeAdjustCenter}>
-                  <Text style={styles.timeAdjustLabel}>{formatHourLabel(targetHour)}</Text>
-                  <Text style={styles.timeAdjustMeta}>Start time</Text>
+              <View style={styles.timePickerRow}>
+                <View style={styles.timePickerField}>
+                  <Text style={styles.timePickerLabel}>Hour</Text>
+                  <View style={styles.timeStepperRow}>
+                    <Pressable hitSlop={8} onPress={() => shiftTargetHour(-1)} style={styles.timeAdjustButton}>
+                      <Ionicons color={colors.textPrimary} name="remove" size={16} />
+                    </Pressable>
+                    <View style={styles.timeAdjustCenter}>
+                      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.timeAdjustLabel}>
+                        {formatHourLabel(targetHour)}
+                      </Text>
+                    </View>
+                    <Pressable hitSlop={8} onPress={() => shiftTargetHour(1)} style={styles.timeAdjustButton}>
+                      <Ionicons color={colors.textPrimary} name="add" size={16} />
+                    </Pressable>
+                  </View>
                 </View>
-                <Pressable hitSlop={8} onPress={() => shiftTargetHour(1)} style={styles.timeAdjustButton}>
-                  <Ionicons color={colors.textPrimary} name="add" size={16} />
-                </Pressable>
+
+                <View style={styles.timePickerField}>
+                  <Text style={styles.timePickerLabel}>Minute</Text>
+                  <View style={styles.timeStepperRow}>
+                    <Pressable hitSlop={8} onPress={() => shiftTargetMinute(-1)} style={styles.timeAdjustButton}>
+                      <Ionicons color={colors.textPrimary} name="remove" size={16} />
+                    </Pressable>
+                    <View style={styles.timeAdjustCenter}>
+                      <Text style={styles.timeAdjustLabel}>{String(targetMinute).padStart(2, '0')}</Text>
+                    </View>
+                    <Pressable hitSlop={8} onPress={() => shiftTargetMinute(1)} style={styles.timeAdjustButton}>
+                      <Ionicons color={colors.textPrimary} name="add" size={16} />
+                    </Pressable>
+                  </View>
+                </View>
               </View>
-              <Text style={styles.modalCounterMeta}>For {formatReadableDate(selectedDate)} at {formatHourLabel(targetHour)}</Text>
+              <Text style={styles.modalCounterMeta}>
+                For {formatReadableDate(selectedDate)} ·{' '}
+                {formatDateKeyTimeRange(selectedKey, targetHour, targetMinute, Math.max(getPositiveMinutes(draftMinutes), 1))}
+              </Text>
             </View>
 
             <View style={styles.adjustRow}>
@@ -862,7 +1068,9 @@ export default function AddScreen() {
             </View>
             <Text style={styles.dialogTitle}>Delete walking session?</Text>
             <Text style={styles.dialogText}>
-              This removes the selected session. Multi-hour sessions added together are removed together.
+              {pendingDeleteSessions.length > 1
+                ? `This walking session spans ${pendingDeleteSessions.length} linked entries across multiple hours. Deleting it will remove all of them.`
+                : 'This removes the selected walking session.'}
             </Text>
 
             <View style={styles.dialogActions}>
