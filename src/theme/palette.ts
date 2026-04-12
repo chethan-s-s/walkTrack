@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, Theme } from '@react-navigation/native';
 import { ColorSchemeName } from 'react-native';
 
 export type AppColors = {
+  isLight: boolean;
   background: string;
   surface: string;
   surfaceAlt: string;
@@ -30,6 +31,7 @@ export type AppColors = {
 };
 
 const darkColors: AppColors = {
+  isLight: false,
   background: '#09090b',
   surface: '#111113',
   surfaceAlt: '#18181b',
@@ -49,15 +51,16 @@ const darkColors: AppColors = {
   successText: '#dcfce7',
   warning: '#21180a',
   warningBorder: '#7c5a1d',
-  heatEmpty: '#18181b',
-  heatLow: '#3f3f46',
-  heatMid: '#71717a',
-  heatHigh: '#fafafa',
+  heatEmpty: '#161b22',
+  heatLow: '#0e4429',
+  heatMid: '#006d32',
+  heatHigh: '#26a641',
   overlay: 'rgba(0, 0, 0, 0.5)',
   shadow: '#000000',
 };
 
 const lightColors: AppColors = {
+  isLight: true,
   background: '#f5f5f5',
   surface: '#ffffff',
   surfaceAlt: '#f4f4f5',
@@ -77,10 +80,10 @@ const lightColors: AppColors = {
   successText: '#14532d',
   warning: '#fef3c7',
   warningBorder: '#f59e0b',
-  heatEmpty: '#e4e4e7',
-  heatLow: '#d4d4d8',
-  heatMid: '#a1a1aa',
-  heatHigh: '#3f3f46',
+  heatEmpty: '#ebedf0',
+  heatLow: '#9be9a8',
+  heatMid: '#40c463',
+  heatHigh: '#216e39',
   overlay: 'rgba(0, 0, 0, 0.18)',
   shadow: '#000000',
 };

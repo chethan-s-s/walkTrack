@@ -375,6 +375,10 @@ export default function AddScreen() {
     setIsModalVisible(false);
   };
 
+  const shiftTargetHour = (delta: -1 | 1) => {
+    setTargetHour((currentHour) => (currentHour + delta + 24) % 24);
+  };
+
   const finalizeCreateDrag = async () => {
     const activeDrag = createDragRef.current;
     setCreateDrag(null);
@@ -596,7 +600,7 @@ export default function AddScreen() {
     const batchId = `${selectedKey}-${targetHour}-${Date.now()}`;
 
     for (const segment of hourSegments) {
-      await saveWalkingSession(selectedKey, segment.minutes, segment.hour, batchId);
+      await saveWalkingSession(selectedKey, segment.minutes, segment.hour, 0, batchId);
     }
 
     closeModal();
@@ -702,16 +706,26 @@ export default function AddScreen() {
                             <Text style={styles.sessionMeta}>{formatSessionTime(session.createdAt)}</Text>
                           </View>
                           {canEditSelectedDate ? (
-                            <Pressable
-                              onPress={(event) => {
-                                event.stopPropagation();
-                                confirmDeleteSession(session);
-                              }}
-                              style={styles.sessionDeleteButton}
-                            >
-                              <Ionicons color={colors.textPrimary} name="trash-outline" size={14} />
-                            </Pressable>
-                          ) : null}
+                            <View style={styles.sessionActions}>
+                              <View style={styles.sessionTimePill}>
+                                <Text style={styles.sessionTimePillText}>{formatSessionTime(session.createdAt)}</Text>
+                              </View>
+                              <Pressable
+                                hitSlop={8}
+                                onPress={(event) => {
+                                  event.stopPropagation();
+                                  confirmDeleteSession(session);
+                                }}
+                                style={styles.sessionDeleteButton}
+                              >
+                                <Ionicons color={colors.textPrimary} name="trash-outline" size={16} />
+                              </Pressable>
+                            </View>
+                          ) : (
+                            <View style={styles.sessionTimePill}>
+                              <Text style={styles.sessionTimePillText}>{formatSessionTime(session.createdAt)}</Text>
+                            </View>
+                          )}
                         </Pressable>
                       </View>
                     ))}
@@ -778,14 +792,14 @@ export default function AddScreen() {
                 <Text style={styles.modalCounterUnit}>min</Text>
               </View>
               <View style={styles.timeAdjustRow}>
-                <Pressable onPress={() => setTargetHour((currentHour) => (currentHour + 23) % 24)} style={styles.timeAdjustButton}>
+                <Pressable hitSlop={8} onPress={() => shiftTargetHour(-1)} style={styles.timeAdjustButton}>
                   <Ionicons color={colors.textPrimary} name="remove" size={16} />
                 </Pressable>
                 <View style={styles.timeAdjustCenter}>
                   <Text style={styles.timeAdjustLabel}>{formatHourLabel(targetHour)}</Text>
                   <Text style={styles.timeAdjustMeta}>Start time</Text>
                 </View>
-                <Pressable onPress={() => setTargetHour((currentHour) => (currentHour + 1) % 24)} style={styles.timeAdjustButton}>
+                <Pressable hitSlop={8} onPress={() => shiftTargetHour(1)} style={styles.timeAdjustButton}>
                   <Ionicons color={colors.textPrimary} name="add" size={16} />
                 </Pressable>
               </View>
@@ -848,7 +862,7 @@ export default function AddScreen() {
             </View>
             <Text style={styles.dialogTitle}>Delete walking session?</Text>
             <Text style={styles.dialogText}>
-              This removes the selected session. Multi-hour sessions added together will be removed together.
+              This removes the selected session. Multi-hour sessions added together are removed together.
             </Text>
 
             <View style={styles.dialogActions}>

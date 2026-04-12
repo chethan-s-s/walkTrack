@@ -24,10 +24,10 @@ type WalkingDataContextValue = {
   weeklyMinutes: number;
   todayMinutes: number;
   averageMinutes: number;
-  saveWalkingSession: (date: string, minutes: number, hour?: number, batchId?: string) => Promise<void>;
+  saveWalkingSession: (date: string, minutes: number, hour?: number, minute?: number, batchId?: string) => Promise<void>;
   deleteWalkingSession: (date: string, session: WalkingSession) => Promise<void>;
   restoreWalkingSessions: (sessions: WalkingSession[]) => Promise<void>;
-  updateWalkingSession: (date: string, sessionId: string, nextDate: string, minutes: number, hour: number) => Promise<void>;
+  updateWalkingSession: (date: string, sessionId: string, nextDate: string, minutes: number, hour: number, minute?: number) => Promise<void>;
   getEntryForDate: (date: string) => WalkingEntry | undefined;
 };
 
@@ -47,8 +47,8 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
     hydrate();
   }, []);
 
-  const saveWalkingSession = useCallback(async (date: string, minutes: number, hour?: number, batchId?: string) => {
-    const nextEntries = await appendEntry(date, minutes, hour, batchId);
+  const saveWalkingSession = useCallback(async (date: string, minutes: number, hour?: number, minute?: number, batchId?: string) => {
+    const nextEntries = await appendEntry(date, minutes, hour, minute, batchId);
     setEntries(nextEntries);
   }, []);
 
@@ -63,8 +63,8 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
   }, []);
 
   const updateWalkingSession = useCallback(
-    async (date: string, sessionId: string, nextDate: string, minutes: number, hour: number) => {
-      const nextEntries = await updateStoredSession(date, sessionId, nextDate, minutes, hour);
+    async (date: string, sessionId: string, nextDate: string, minutes: number, hour: number, minute?: number) => {
+      const nextEntries = await updateStoredSession(date, sessionId, nextDate, minutes, hour, minute);
       setEntries(nextEntries);
     },
     [],

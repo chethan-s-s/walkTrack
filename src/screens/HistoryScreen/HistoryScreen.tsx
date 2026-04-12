@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { getDateKey } from '../../storage/walkingStorage';
 import { useAppColors } from '../../theme/useAppColors';
@@ -40,9 +41,23 @@ const formatHistoryDate = (value: string) => {
   });
 };
 
+const formatClockTime = (date: Date) =>
+  date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+const formatSessionTimeRange = (createdAt: string, durationMinutes: number) => {
+  const start = new Date(createdAt);
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
+};
+
 export default function HistoryScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { settings } = useAppSettings();
   const { entries, loading } = useWalkingData();
   const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'longest'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,14 +95,22 @@ export default function HistoryScreen() {
   }, [entries]);
 
   const filteredEntries = useMemo(
-    () => getFilteredHistoryEntries(dailyEntries, activeFilter, searchQuery),
-    [activeFilter, dailyEntries, searchQuery],
+    () => getFilteredHistoryEntries(dailyEntries, activeFilter, searchQuery, settings.weekStart),
+    [activeFilter, dailyEntries, searchQuery, settings.weekStart],
   );
+
+  const triggerSelectionHaptic = async () => {
+    if (!settings.hapticsEnabled) {
+      return;
+    }
+
+    await Haptics.selectionAsync();
+  };
 
   const toggleExpanded = async (date: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedDate((currentDate) => (currentDate === date ? null : date));
-    await Haptics.selectionAsync();
+    await triggerSelectionHaptic();
   };
 
   if (loading) {
@@ -109,7 +132,7 @@ export default function HistoryScreen() {
         ListHeaderComponent={
           <View style={styles.headerWrap}>
             <Text style={styles.title}>History</Text>
-            <Text style={styles.subtitle}>Search and expand any day to inspect saved sessions.</Text>
+            <Text style={styles.subtitle}>Review saved sessions.</Text>
 
             <View style={styles.searchCard}>
               <Ionicons color={colors.textMuted} name="search" size={18} />
@@ -136,7 +159,7 @@ export default function HistoryScreen() {
                     key={value}
                     onPress={async () => {
                       setActiveFilter(value as typeof activeFilter);
-                      await Haptics.selectionAsync();
+                      await triggerSelectionHaptic();
                     }}
                     style={[styles.filterChip, active && styles.filterChipActive]}
                   >
@@ -150,7 +173,7 @@ export default function HistoryScreen() {
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No history yet</Text>
-            <Text style={styles.emptyText}>Save your first walking session to build your daily streak.</Text>
+            <Text style={styles.emptyText}>Save a session to see it here.</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -180,9 +203,7 @@ export default function HistoryScreen() {
                 {item.sessions.map((session) => (
                   <View key={session.id} style={styles.sessionRow}>
                     <Text style={styles.sessionTitle}>{formatDuration(session.minutes)} walk</Text>
-                    <Text style={styles.sessionMeta}>
-                      {new Date(session.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </Text>
+                    <Text style={styles.sessionMeta}>{formatSessionTimeRange(session.createdAt, session.minutes)}</Text>
                   </View>
                 ))}
               </View>

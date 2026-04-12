@@ -6,10 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppSettingsProvider } from './src/context/AppSettingsContext';
 import { WalkingDataProvider } from './src/context/WalkingDataContext';
 import AddScreen from './src/screens/AddScreen/AddScreen';
 import HistoryScreen from './src/screens/HistoryScreen/HistoryScreen';
 import HomeScreen from './src/screens/HomeScreen/HomeScreen';
+import MoreScreen from './src/screens/MoreScreen/MoreScreen';
 import { getAppColors, getNavigationTheme } from './src/theme/palette';
 import { RootTabParamList } from './src/types';
 
@@ -26,6 +28,10 @@ const getTabIconName = (routeName: keyof RootTabParamList, focused: boolean): Ic
     return focused ? 'add-circle' : 'add-circle-outline';
   }
 
+  if (routeName === 'More') {
+    return focused ? 'menu' : 'menu-outline';
+  }
+
   return focused ? 'time' : 'time-outline';
 };
 
@@ -36,40 +42,43 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <WalkingDataProvider>
-        <NavigationContainer theme={appTheme}>
-          <StatusBar animated backgroundColor={colors.background} style={scheme === 'light' ? 'dark' : 'light'} />
-          <Tab.Navigator
-            screenOptions={({ route }) => ({
-              headerShown: false,
-              tabBarShowLabel: true,
-              tabBarActiveTintColor: colors.textPrimary,
-              tabBarInactiveTintColor: colors.textMuted,
-              tabBarStyle: {
-                backgroundColor: colors.tabBar,
-                borderTopColor: colors.border,
-                height: 58,
-                paddingTop: 6,
-                paddingBottom: 6,
-              },
-              tabBarLabelStyle: {
-                fontSize: 12,
-                fontWeight: '700',
-              },
-              tabBarItemStyle: {
-                paddingVertical: 2,
-              },
-              tabBarIcon: ({ color, focused, size }) => (
-                <Ionicons color={color} name={getTabIconName(route.name, focused)} size={size} />
-              ),
-            })}
-          >
-            <Tab.Screen component={HomeScreen} name="Home" />
-            <Tab.Screen component={AddScreen} name="Add" />
-            <Tab.Screen component={HistoryScreen} name="History" />
-          </Tab.Navigator>
-        </NavigationContainer>
-      </WalkingDataProvider>
+      <AppSettingsProvider>
+        <WalkingDataProvider>
+          <NavigationContainer theme={appTheme}>
+            <StatusBar animated backgroundColor={colors.background} style={scheme === 'light' ? 'dark' : 'light'} />
+            <Tab.Navigator
+              screenOptions={({ route }) => ({
+                headerShown: false,
+                tabBarShowLabel: true,
+                tabBarActiveTintColor: colors.textPrimary,
+                tabBarInactiveTintColor: colors.textMuted,
+                tabBarStyle: {
+                  backgroundColor: colors.tabBar,
+                  borderTopColor: colors.border,
+                  height: 58,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                },
+                tabBarLabelStyle: {
+                  fontSize: 12,
+                  fontWeight: '700',
+                },
+                tabBarItemStyle: {
+                  paddingVertical: 2,
+                },
+                tabBarIcon: ({ color, focused, size }) => (
+                  <Ionicons color={color} name={getTabIconName(route.name, focused)} size={size} />
+                ),
+              })}
+            >
+              <Tab.Screen component={HomeScreen} name="Home" />
+              <Tab.Screen component={AddScreen} name="Add" />
+              <Tab.Screen component={HistoryScreen} name="History" />
+              <Tab.Screen component={MoreScreen} name="More" />
+            </Tab.Navigator>
+          </NavigationContainer>
+        </WalkingDataProvider>
+      </AppSettingsProvider>
     </SafeAreaProvider>
   );
 }

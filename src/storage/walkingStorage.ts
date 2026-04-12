@@ -28,16 +28,17 @@ export const getDateKey = (date = new Date()) => {
   return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
 
-const getTimestampForDate = (dateKey: string, hour?: number) => {
+const getTimestampForDate = (dateKey: string, hour?: number, minute?: number) => {
   const currentDate = new Date();
   const [year, month, day] = dateKey.split('-').map(Number);
   const targetHour = hour ?? currentDate.getHours();
+  const targetMinute = minute ?? (hour === undefined ? currentDate.getMinutes() : 0);
   const timestamp = new Date(
     year,
     month - 1,
     day,
     targetHour,
-    currentDate.getMinutes(),
+    targetMinute,
     currentDate.getSeconds(),
     currentDate.getMilliseconds(),
   );
@@ -107,11 +108,12 @@ export async function appendEntry(
   date: string,
   minutes: number,
   hour?: number,
+  minute?: number,
   batchId?: string,
 ): Promise<WalkingEntry[]> {
   const entries = await loadEntries();
   const existingEntry = entries.find((entry) => entry.date === date);
-  const createdAt = getTimestampForDate(date, hour);
+  const createdAt = getTimestampForDate(date, hour, minute);
   const nextSession: WalkingSession = {
     id: `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
     batchId,
@@ -208,6 +210,7 @@ export async function updateStoredSession(
   nextDate: string,
   minutes: number,
   hour: number,
+  minute?: number,
 ): Promise<WalkingEntry[]> {
   const entries = await loadEntries();
   const existingEntry = entries.find((entry) => entry.date === date);
@@ -227,17 +230,25 @@ export async function updateStoredSession(
     ...targetSession,
     date: nextDate,
     minutes,
-    createdAt: getTimestampForDate(nextDate, hour),
+    createdAt: getTimestampForDate(nextDate, hour, minute),
   };
 
   let nextEntries = entries.filter((entry) => entry.date !== date && entry.date !== nextDate);
 
-  if (remainingSourceSessions.length) {
-    nextEntries.push(buildEntry(date, remainingSourceSessions));
-  }
+  if (date === nextDate) {
+    const rebuiltSessions = [...remainingSourceSessions, nextSession];
 
-  const targetEntry = entries.find((entry) => entry.date === nextDate && entry.date !== date);
-  nextEntries.push(buildEntry(nextDate, [...(targetEntry?.sessions ?? []), nextSession]));
+    if (rebuiltSessions.length) {
+      nextEntries.push(buildEntry(date, rebuiltSessions));
+    }
+  } else {
+    if (remainingSourceSessions.length) {
+      nextEntries.push(buildEntry(date, remainingSourceSessions));
+    }
+
+    const targetEntry = entries.find((entry) => entry.date === nextDate);
+    nextEntries.push(buildEntry(nextDate, [...(targetEntry?.sessions ?? []), nextSession]));
+  }
 
   const sortedEntries = sortEntries(nextEntries);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sortedEntries));
