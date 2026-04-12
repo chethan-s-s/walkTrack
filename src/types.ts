@@ -1,5 +1,6 @@
 export type WalkingSession = {
   id: string;
+  batchId?: string;
   date: string;
   minutes: number;
   createdAt: string;

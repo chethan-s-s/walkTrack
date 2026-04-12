@@ -8,8 +8,8 @@ import React, {
   useState,
 } from 'react';
 
-import { appendEntry, getDateKey, loadEntries } from '../storage/walkingStorage';
-import { WalkingEntry } from '../types';
+import { appendEntry, deleteSession, getDateKey, loadEntries } from '../storage/walkingStorage';
+import { WalkingEntry, WalkingSession } from '../types';
 
 type WalkingDataContextValue = {
   entries: WalkingEntry[];
@@ -17,7 +17,8 @@ type WalkingDataContextValue = {
   weeklyMinutes: number;
   todayMinutes: number;
   averageMinutes: number;
-  saveWalkingSession: (date: string, minutes: number) => Promise<void>;
+  saveWalkingSession: (date: string, minutes: number, hour?: number, batchId?: string) => Promise<void>;
+  deleteWalkingSession: (date: string, session: WalkingSession) => Promise<void>;
   getEntryForDate: (date: string) => WalkingEntry | undefined;
 };
 
@@ -37,8 +38,13 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
     hydrate();
   }, []);
 
-  const saveWalkingSession = useCallback(async (date: string, minutes: number) => {
-    const nextEntries = await appendEntry(date, minutes);
+  const saveWalkingSession = useCallback(async (date: string, minutes: number, hour?: number, batchId?: string) => {
+    const nextEntries = await appendEntry(date, minutes, hour, batchId);
+    setEntries(nextEntries);
+  }, []);
+
+  const deleteWalkingSession = useCallback(async (date: string, session: WalkingSession) => {
+    const nextEntries = await deleteSession(date, session.id, session.batchId);
     setEntries(nextEntries);
   }, []);
 
@@ -78,10 +84,11 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
       weeklyMinutes,
       todayMinutes,
       averageMinutes,
+      deleteWalkingSession,
       saveWalkingSession,
       getEntryForDate,
     }),
-    [averageMinutes, entries, getEntryForDate, loading, saveWalkingSession, todayMinutes, weeklyMinutes],
+    [averageMinutes, deleteWalkingSession, entries, getEntryForDate, loading, saveWalkingSession, todayMinutes, weeklyMinutes],
   );
 
   return <WalkingDataContext.Provider value={value}>{children}</WalkingDataContext.Provider>;

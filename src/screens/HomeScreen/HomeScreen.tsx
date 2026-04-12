@@ -9,7 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { getDateKey } from '../../storage/walkingStorage';
-import { styles } from './styles';
+import { formatDuration } from '../../utils/formatDuration';
+import { styles } from './HomeScreenStyles';
 
 const formatDay = (date: Date) =>
   date.toLocaleDateString('en-US', {
@@ -63,20 +64,20 @@ export default function HomeScreen() {
         <View style={styles.statGrid}>
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Today</Text>
-            <Text style={styles.cardValue}>{todayMinutes} min</Text>
+            <Text style={styles.cardValue}>{formatDuration(todayMinutes)}</Text>
           </View>
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Last 7 days</Text>
-            <Text style={styles.cardValue}>{weeklyMinutes} min</Text>
+            <Text style={styles.cardValue}>{formatDuration(weeklyMinutes)}</Text>
           </View>
           <View style={styles.cardWide}>
             <Text style={styles.cardLabel}>Daily average</Text>
-            <Text style={styles.cardValue}>{averageMinutes} min</Text>
+            <Text style={styles.cardValue}>{formatDuration(averageMinutes)}</Text>
           </View>
         </View>
 
         <View style={styles.chartCard}>
-          <Text style={styles.sectionTitle}>Weekly rhythm</Text>
+          <Text style={styles.sectionTitle}>Weekly Rhythm</Text>
           <Text style={styles.sectionSubtitle}>A quick glance at the last 7 days.</Text>
           <View style={styles.chartWrap}>
             {weeklyBars.map((bar) => {
@@ -84,7 +85,7 @@ export default function HomeScreen() {
 
               return (
                 <View key={bar.key} style={styles.barColumn}>
-                  <Text style={styles.barMinutes}>{bar.minutes}</Text>
+                  <Text style={styles.barMinutes}>{formatDuration(bar.minutes)}</Text>
                   <View style={styles.barTrack}>
                     <View style={[styles.barFill, { height }]} />
                   </View>

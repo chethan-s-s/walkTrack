@@ -6,9 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { WalkingDataProvider } from './src/context/WalkingDataContext';
-import AddScreen from './src/screens/AddScreen';
-import HistoryScreen from './src/screens/HistoryScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import AddScreen from './src/screens/AddScreen/AddScreen';
+import HistoryScreen from './src/screens/HistoryScreen/HistoryScreen';
+import HomeScreen from './src/screens/HomeScreen/HomeScreen';
 import { RootTabParamList } from './src/types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -50,13 +50,13 @@ export default function App() {
               headerShown: false,
               tabBarShowLabel: true,
               tabBarActiveTintColor: '#fafafa',
-              tabBarInactiveTintColor: '#71717a',
+              tabBarInactiveTintColor: '#fafafa',
               tabBarStyle: {
-                backgroundColor: '#111113',
+                backgroundColor: '#323232',
                 borderTopColor: '#27272a',
-                height: 64,
-                paddingTop: 6,
-                paddingBottom: 8,
+                height: 56,
+                paddingTop: 4,
+                paddingBottom: 4,
               },
               tabBarLabelStyle: {
                 fontSize: 12,
