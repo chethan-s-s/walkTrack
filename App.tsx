@@ -38,23 +38,26 @@ export default function App() {
     <SafeAreaProvider>
       <WalkingDataProvider>
         <NavigationContainer theme={appTheme}>
-          <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
+          <StatusBar animated backgroundColor={colors.background} style={scheme === 'light' ? 'dark' : 'light'} />
           <Tab.Navigator
             screenOptions={({ route }) => ({
               headerShown: false,
               tabBarShowLabel: true,
               tabBarActiveTintColor: colors.textPrimary,
-              tabBarInactiveTintColor: colors.textPrimary,
+              tabBarInactiveTintColor: colors.textMuted,
               tabBarStyle: {
                 backgroundColor: colors.tabBar,
                 borderTopColor: colors.border,
-                height: 56,
-                paddingTop: 4,
-                paddingBottom: 4,
+                height: 58,
+                paddingTop: 6,
+                paddingBottom: 6,
               },
               tabBarLabelStyle: {
                 fontSize: 12,
                 fontWeight: '700',
+              },
+              tabBarItemStyle: {
+                paddingVertical: 2,
               },
               tabBarIcon: ({ color, focused, size }) => (
                 <Ionicons color={color} name={getTabIconName(route.name, focused)} size={size} />

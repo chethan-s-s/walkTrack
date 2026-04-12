@@ -632,7 +632,9 @@ export default function AddScreen() {
             <Text style={styles.summaryLabel}>Selected day total</Text>
             <Text style={styles.summaryValue}>{formatDuration(totalMinutes)}</Text>
           </View>
-          <Text style={styles.summaryMeta}>{selectedEntry?.sessions.length ?? 0} sessions</Text>
+          <Text style={styles.summaryMeta}>
+            {selectedEntry?.sessions.length ?? 0} session{(selectedEntry?.sessions.length ?? 0) === 1 ? '' : 's'}
+          </Text>
         </View>
 
         <View style={styles.timelineCard}>
