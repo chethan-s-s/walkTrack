@@ -8,7 +8,14 @@ import React, {
   useState,
 } from 'react';
 
-import { appendEntry, deleteSession, getDateKey, loadEntries } from '../storage/walkingStorage';
+import {
+  appendEntry,
+  deleteSession,
+  getDateKey,
+  loadEntries,
+  restoreSessions,
+  updateStoredSession,
+} from '../storage/walkingStorage';
 import { WalkingEntry, WalkingSession } from '../types';
 
 type WalkingDataContextValue = {
@@ -19,6 +26,8 @@ type WalkingDataContextValue = {
   averageMinutes: number;
   saveWalkingSession: (date: string, minutes: number, hour?: number, batchId?: string) => Promise<void>;
   deleteWalkingSession: (date: string, session: WalkingSession) => Promise<void>;
+  restoreWalkingSessions: (sessions: WalkingSession[]) => Promise<void>;
+  updateWalkingSession: (date: string, sessionId: string, nextDate: string, minutes: number, hour: number) => Promise<void>;
   getEntryForDate: (date: string) => WalkingEntry | undefined;
 };
 
@@ -47,6 +56,19 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
     const nextEntries = await deleteSession(date, session.id, session.batchId);
     setEntries(nextEntries);
   }, []);
+
+  const restoreWalkingSessions = useCallback(async (sessions: WalkingSession[]) => {
+    const nextEntries = await restoreSessions(sessions);
+    setEntries(nextEntries);
+  }, []);
+
+  const updateWalkingSession = useCallback(
+    async (date: string, sessionId: string, nextDate: string, minutes: number, hour: number) => {
+      const nextEntries = await updateStoredSession(date, sessionId, nextDate, minutes, hour);
+      setEntries(nextEntries);
+    },
+    [],
+  );
 
   const getEntryForDate = useCallback(
     (date: string) => entries.find((entry) => entry.date === date),
@@ -86,9 +108,22 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
       averageMinutes,
       deleteWalkingSession,
       saveWalkingSession,
+      restoreWalkingSessions,
+      updateWalkingSession,
       getEntryForDate,
     }),
-    [averageMinutes, deleteWalkingSession, entries, getEntryForDate, loading, saveWalkingSession, todayMinutes, weeklyMinutes],
+    [
+      averageMinutes,
+      deleteWalkingSession,
+      entries,
+      getEntryForDate,
+      loading,
+      restoreWalkingSessions,
+      saveWalkingSession,
+      todayMinutes,
+      updateWalkingSession,
+      weeklyMinutes,
+    ],
   );
 
   return <WalkingDataContext.Provider value={value}>{children}</WalkingDataContext.Provider>;

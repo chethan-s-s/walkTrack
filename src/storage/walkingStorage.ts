@@ -76,6 +76,18 @@ const normalizeEntry = (entry: WalkingEntry | LegacyWalkingEntry): WalkingEntry 
   };
 };
 
+const buildEntry = (date: string, sessions: WalkingSession[]): WalkingEntry => {
+  const sortedSessions = sortSessions(sessions);
+
+  return {
+    id: date,
+    date,
+    totalMinutes: sortedSessions.reduce((total, session) => total + session.minutes, 0),
+    createdAt: sortedSessions[0]?.createdAt ?? new Date().toISOString(),
+    sessions: sortedSessions,
+  };
+};
+
 export async function loadEntries(): Promise<WalkingEntry[]> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
 
@@ -160,4 +172,74 @@ export async function deleteSession(
 
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextEntries));
   return nextEntries;
+}
+
+export async function restoreSessions(sessions: WalkingSession[]): Promise<WalkingEntry[]> {
+  if (!sessions.length) {
+    return loadEntries();
+  }
+
+  const entries = await loadEntries();
+  const groupedSessions = sessions.reduce<Record<string, WalkingSession[]>>((accumulator, session) => {
+    accumulator[session.date] = [...(accumulator[session.date] ?? []), session];
+    return accumulator;
+  }, {});
+
+  let nextEntries = [...entries];
+
+  Object.entries(groupedSessions).forEach(([date, dateSessions]) => {
+    const existingEntry = nextEntries.find((entry) => entry.date === date);
+    const restoredEntry = buildEntry(date, [...(existingEntry?.sessions ?? []), ...dateSessions]);
+
+    nextEntries = [
+      ...nextEntries.filter((entry) => entry.date !== date),
+      restoredEntry,
+    ];
+  });
+
+  const sortedEntries = sortEntries(nextEntries);
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sortedEntries));
+  return sortedEntries;
+}
+
+export async function updateStoredSession(
+  date: string,
+  sessionId: string,
+  nextDate: string,
+  minutes: number,
+  hour: number,
+): Promise<WalkingEntry[]> {
+  const entries = await loadEntries();
+  const existingEntry = entries.find((entry) => entry.date === date);
+
+  if (!existingEntry) {
+    return entries;
+  }
+
+  const targetSession = existingEntry.sessions.find((session) => session.id === sessionId);
+
+  if (!targetSession) {
+    return entries;
+  }
+
+  const remainingSourceSessions = existingEntry.sessions.filter((session) => session.id !== sessionId);
+  const nextSession: WalkingSession = {
+    ...targetSession,
+    date: nextDate,
+    minutes,
+    createdAt: getTimestampForDate(nextDate, hour),
+  };
+
+  let nextEntries = entries.filter((entry) => entry.date !== date && entry.date !== nextDate);
+
+  if (remainingSourceSessions.length) {
+    nextEntries.push(buildEntry(date, remainingSourceSessions));
+  }
+
+  const targetEntry = entries.find((entry) => entry.date === nextDate && entry.date !== date);
+  nextEntries.push(buildEntry(nextDate, [...(targetEntry?.sessions ?? []), nextSession]));
+
+  const sortedEntries = sortEntries(nextEntries);
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sortedEntries));
+  return sortedEntries;
 }
