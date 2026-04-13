@@ -124,7 +124,7 @@ export const createStyles = (colors: AppColors) =>
       gap: 12,
     },
     card: {
-      width: '47%',
+      width: '48%',
       backgroundColor: colors.surface,
       borderRadius: 24,
       padding: 16,
