@@ -66,11 +66,11 @@ export default function SessionModal({
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>{editingSession ? 'Edit walking session' : 'Add walking minutes'}</Text>
-          <Text style={styles.modalSubtitle}>
+          {/* <Text style={styles.modalSubtitle}>
             {editingSession
               ? `Update to ${draftMinutes || '0'} mins.`
               : `Add to ${draftMinutes || '0'} mins.`}
-          </Text>
+          </Text> */}
 
           {warningToast ? <View style={styles.modalToastWrap}>{warningToast}</View> : null}
 
@@ -151,7 +151,7 @@ export default function SessionModal({
           </View>
 
           <View style={styles.adjustRow}>
-            {[-5, 5].map((delta) => (
+            {[-5, -1, 1, 5].map((delta) => (
               <Pressable
                 key={delta}
                 accessibilityLabel={`${delta > 0 ? 'Increase' : 'Decrease'} minutes by ${Math.abs(delta)}`}

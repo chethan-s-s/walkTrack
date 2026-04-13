@@ -347,17 +347,17 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   adjustRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   adjustButton: {
     flexGrow: 1,
-    minWidth: '47%',
+    minWidth: '22%',
     backgroundColor: colors.actionSurface,
     borderRadius: 18,
-    paddingVertical: 16,
+    paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.actionBorder,
   },
   adjustButtonText: {
     color: colors.textPrimary,
@@ -568,7 +568,8 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   modalCounterCard: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: 24,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.actionBorder,
     alignItems: 'center',
