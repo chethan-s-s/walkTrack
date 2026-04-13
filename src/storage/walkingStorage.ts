@@ -167,33 +167,32 @@ export async function appendEntry(
   batchId?: string,
 ): Promise<WalkingEntry[]> {
   const entries = await loadEntries();
-  const existingEntry = entries.find((entry) => entry.date === date);
-  const createdAt = getTimestampForDate(date, hour, minute);
+  const targetHour = hour ?? new Date().getHours();
+  const targetMinute = minute ?? (hour === undefined ? new Date().getMinutes() : 0);
+  const createdAt = getTimestampForDate(date, targetHour, targetMinute);
   const sessionGroupId = batchId ?? createSessionGroupId(createdAt);
-  const nextSession: WalkingSession = {
-    id: batchId ? `${sessionGroupId}-${Math.random().toString(36).slice(2, 8)}` : sessionGroupId,
-    batchId: sessionGroupId,
-    date,
-    minutes,
-    createdAt,
-  };
-  const nextSessions = sortSessions([...(existingEntry?.sessions ?? []), nextSession]);
+  const nextSessions = buildSplitSessions(date, minutes, targetHour, targetMinute, sessionGroupId);
+  const groupedSessions = nextSessions.reduce<Record<string, WalkingSession[]>>((accumulator, session) => {
+    accumulator[session.date] = [...(accumulator[session.date] ?? []), session];
+    return accumulator;
+  }, {});
 
-  const nextEntry: WalkingEntry = {
-    id: existingEntry?.id ?? date,
-    date,
-    totalMinutes: nextSessions.reduce((total, session) => total + session.minutes, 0),
-    createdAt: nextSessions[0]?.createdAt ?? createdAt,
-    sessions: nextSessions,
-  };
+  let nextEntries = [...entries];
 
-  const nextEntries = sortEntries([
-    ...entries.filter((entry) => entry.date !== date),
-    nextEntry,
-  ]);
+  Object.entries(groupedSessions).forEach(([entryDate, dateSessions]) => {
+    const existingEntry = nextEntries.find((entry) => entry.date === entryDate);
+    const rebuiltEntry = buildEntry(entryDate, [...(existingEntry?.sessions ?? []), ...dateSessions]);
 
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextEntries));
-  return nextEntries;
+    nextEntries = [
+      ...nextEntries.filter((entry) => entry.date !== entryDate),
+      rebuiltEntry,
+    ];
+  });
+
+  const sortedEntries = sortEntries(nextEntries);
+
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sortedEntries));
+  return sortedEntries;
 }
 
 export async function deleteSession(
@@ -288,13 +287,17 @@ export async function updateStoredSession(
   minute?: number,
 ): Promise<WalkingEntry[]> {
   const entries = await loadEntries();
-  const linkedSessions = entries.flatMap((entry) =>
-    entry.sessions.filter((session) => getSessionGroupId(session) === sessionId || session.id === sessionId),
-  );
+  const matchedSession = entries
+    .flatMap((entry) => entry.sessions)
+    .find((session) => getSessionGroupId(session) === sessionId || session.id === sessionId);
 
-  if (!linkedSessions.length) {
+  if (!matchedSession) {
     return entries;
   }
+
+  const linkedSessions = entries.flatMap((entry) =>
+    entry.sessions.filter((session) => getSessionGroupId(session) === getSessionGroupId(matchedSession)),
+  );
 
   const orderedLinkedSessions = [...linkedSessions].sort(
     (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),

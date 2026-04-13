@@ -19,7 +19,7 @@ export const createStyles = (colors: AppColors) =>
       gap: 14,
     },
     headerWrap: {
-      marginBottom: 20,
+      marginBottom: 16,
       gap: 10,
     },
     title: {
@@ -96,7 +96,7 @@ export const createStyles = (colors: AppColors) =>
     rowCard: {
       backgroundColor: colors.surface,
       borderRadius: 22,
-      padding: 18,
+      padding: 16,
       borderWidth: 1,
       borderColor: colors.border,
       marginBottom: 4,
@@ -107,6 +107,10 @@ export const createStyles = (colors: AppColors) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       gap: 12,
+    },
+    rowTextWrap: {
+      flex: 1,
+      minWidth: 0,
     },
     rowDate: {
       color: colors.textPrimary,
@@ -126,8 +130,10 @@ export const createStyles = (colors: AppColors) =>
     },
     minutesPill: {
       borderRadius: 999,
-      paddingVertical: 12,
-      paddingHorizontal: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      minWidth: 74,
+      alignItems: 'center',
     },
     minutesText: {
       color: colors.background,

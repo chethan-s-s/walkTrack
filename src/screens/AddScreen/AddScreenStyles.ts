@@ -9,12 +9,12 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 18,
     paddingBottom: 0,
-    gap: 16,
+    gap: 14,
   },
   fixedHeaderSection: {
-    gap: 16,
+    gap: 14,
   },
   timelineScrollView: {
     flex: 1,
@@ -29,7 +29,6 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 24,
     paddingHorizontal: 18,
-    paddingVertical: 0,
     borderWidth: 1,
     borderColor: colors.border,
     gap: 12,
@@ -40,13 +39,14 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '600',
   },
   summaryValue: {
-    marginTop: 6,
+    marginTop: 4,
     color: colors.textPrimary,
     fontSize: 28,
     fontWeight: '800',
   },
   summaryValueWrap: {
     flex: 1,
+    minWidth: 0,
   },
   summaryRingWrap: {
     alignItems: 'center',
@@ -63,6 +63,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     flex: 1,
     alignItems: 'flex-end',
     gap: 4,
+    minWidth: 0,
   },
   summaryMetaSecondary: {
     color: colors.textMuted,
@@ -136,7 +137,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   timelineCard: {
     backgroundColor: colors.surface,
     borderRadius: 30,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: colors.border,
     gap: 0,
@@ -280,9 +281,9 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     flexShrink: 0,
   },
   sessionEditButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.actionBorder,
@@ -305,9 +306,9 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '700',
   },
   sessionDeleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.destructive,
     borderWidth: 1,
     borderColor: colors.destructiveBorder,
@@ -320,10 +321,10 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     marginLeft: -2,
   },
   hourActionButton: {
-    width: 22,
-    height: 22,
+    width: 25,
+    height: 25,
     marginLeft: -2,
-    borderRadius: 11,
+    borderRadius: 14,
     backgroundColor: colors.actionSurface,
     borderWidth: 1,
     borderColor: colors.actionBorder,
@@ -334,8 +335,8 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
   },
   hourActionSpacer: {
-    width: 22,
-    height: 22,
+    width: 25,
+    height: 25,
     marginLeft: -2,
   },
   emptyHourDot: {
@@ -372,6 +373,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   quickChip: {
     flex: 1,
     minWidth: 0,
+    minHeight: 42,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.actionBorder,
@@ -386,6 +388,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   quickChipText: {
     color: colors.textPrimary,
+    fontSize: 14,
     fontWeight: '700',
   },
   quickChipTextActive: {

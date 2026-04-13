@@ -3,6 +3,7 @@ import { getSessionGroupId } from './sessionGroups';
 import { getDateKey } from '../storage/walkingStorage';
 
 export type TimeSegment = {
+  dayOffset: number;
   hour: number;
   minute: number;
   minutes: number;
@@ -112,9 +113,9 @@ export const formatDashboardDate = (date: Date) =>
     day: 'numeric',
   });
 
-export const getTimestampForDateTime = (dateKey: string, hour: number, minute: number) => {
+export const getTimestampForDateTime = (dateKey: string, hour: number, minute: number, dayOffset = 0) => {
   const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day, normalizeHour(hour), normalizeMinute(minute), 0, 0);
+  return new Date(year, month - 1, day + dayOffset, normalizeHour(hour), normalizeMinute(minute), 0, 0);
 };
 
 export const formatDateKeyTimeRange = (dateKey: string, hour: number, minute: number, durationMinutes: number) => {
@@ -129,12 +130,17 @@ export const buildSessionSegments = (totalMinutes: number, startingHour: number,
   let remainingMinutes = totalMinutes;
   let currentHour = normalizeHour(startingHour);
   let currentMinute = normalizeMinute(startingMinute);
+  let dayOffset = 0;
 
   while (remainingMinutes > 0) {
     const availableMinutes = segments.length === 0 ? 60 - currentMinute : 60;
     const segmentMinutes = Math.min(remainingMinutes, availableMinutes);
-    segments.push({ hour: currentHour, minute: currentMinute, minutes: segmentMinutes });
+    segments.push({ dayOffset, hour: currentHour, minute: currentMinute, minutes: segmentMinutes });
     remainingMinutes -= segmentMinutes;
+    if (currentHour === 23) {
+      dayOffset += 1;
+    }
+
     currentHour = normalizeHour(currentHour + 1);
     currentMinute = 0;
   }
@@ -180,27 +186,29 @@ export const getHourRange = (hours: number[], startHour: number, endHour: number
 export const getHoursForMinutes = (minutes: number, startingHour: number, startingMinute: number) =>
   buildSessionSegments(minutes, startingHour, startingMinute).map((segment) => segment.hour);
 
-export const getSuggestedStartMinute = (hour: number, sessions: WalkingSession[]) => {
+export const getSuggestedStartMinute = (
+  dateKey: string,
+  hour: number,
+  sessions: WalkingSession[],
+  durationMinutes = 30,
+  excludedSessionIds: string[] = [],
+) => {
   const normalizedHour = normalizeHour(hour);
-  const sessionsInHour = sessions
-    .filter((session) => {
-      const start = new Date(session.createdAt);
-      return start.getHours() === normalizedHour;
-    })
-    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
 
-  if (!sessionsInHour.length) {
-    return 0;
+  for (let minute = 0; minute < 60; minute += 1) {
+    const nextSegments = buildSessionSegments(durationMinutes, normalizedHour, minute);
+    const firstSegment = nextSegments[0];
+
+    if (!firstSegment || firstSegment.hour !== normalizedHour || firstSegment.minute !== minute) {
+      continue;
+    }
+
+    if (!doesTimeRangeCollide(dateKey, sessions, nextSegments, excludedSessionIds)) {
+      return minute;
+    }
   }
 
-  const lastSession = sessionsInHour[sessionsInHour.length - 1];
-  const lastSessionEnd = new Date(new Date(lastSession.createdAt).getTime() + lastSession.minutes * 60_000);
-
-  if (lastSessionEnd.getHours() !== normalizedHour) {
-    return 0;
-  }
-
-  return lastSessionEnd.getMinutes();
+  return null;
 };
 
 export const doesTimeRangeCollide = (
@@ -212,7 +220,7 @@ export const doesTimeRangeCollide = (
   const excludedIds = new Set(excludedSessionIds);
 
   return nextSegments.some((segment) => {
-    const nextStart = getTimestampForDateTime(dateKey, segment.hour, segment.minute);
+    const nextStart = getTimestampForDateTime(dateKey, segment.hour, segment.minute, segment.dayOffset);
     const nextEnd = new Date(nextStart.getTime() + segment.minutes * 60_000);
 
     return sessions

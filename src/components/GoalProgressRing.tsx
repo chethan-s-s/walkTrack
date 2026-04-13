@@ -53,8 +53,12 @@ export default function GoalProgressRing({
         />
       </Svg>
       <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '800' }}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>{sublabel}</Text>
+        <Text adjustsFontSizeToFit numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '800', maxWidth: 72 }}>
+          {label}
+        </Text>
+        <Text adjustsFontSizeToFit numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700', maxWidth: 64 }}>
+          {sublabel}
+        </Text>
       </View>
     </View>
   );

@@ -270,7 +270,14 @@ export default function MoreScreen() {
                     onPress={() => void setWeekStart(value as typeof settings.weekStart)}
                     style={[styles.segmentedButton, active && styles.segmentedButtonActive]}
                   >
-                    <Text style={[styles.segmentedButtonText, active && styles.segmentedButtonTextActive]}>{label}</Text>
+                    <Text
+                      adjustsFontSizeToFit
+                      ellipsizeMode="tail"
+                      numberOfLines={1}
+                      style={[styles.segmentedButtonText, active && styles.segmentedButtonTextActive]}
+                    >
+                      {label}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -292,7 +299,9 @@ export default function MoreScreen() {
                   <Ionicons color={isDailyGoalMinned ? colors.textMuted : colors.textPrimary} name="remove" size={18} />
                 </Pressable>
                 <View style={styles.stepperValueWrap}>
-                  <Text style={styles.stepperValue}>{formatDuration(settings.dailyGoalMinutes)}</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={1} style={styles.stepperValue}>
+                    {formatDuration(settings.dailyGoalMinutes)}
+                  </Text>
                   <Text style={styles.stepperMeta}>daily target</Text>
                 </View>
                 <Pressable
@@ -321,7 +330,7 @@ export default function MoreScreen() {
                   <Ionicons color={isWeeklyGoalDaysMinned ? colors.textMuted : colors.textPrimary} name="remove" size={18} />
                 </Pressable>
                 <View style={styles.stepperValueWrap}>
-                  <Text style={styles.stepperValue}>{settings.weeklyGoalDays}</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={1} style={styles.stepperValue}>{settings.weeklyGoalDays}</Text>
                   <Text style={styles.stepperMeta}>days per week</Text>
                 </View>
                 <Pressable

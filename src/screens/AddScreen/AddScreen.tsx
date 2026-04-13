@@ -34,13 +34,14 @@ import {
   normalizeHour,
   normalizeMinute,
 } from '../../utils/time';
-import { getLinkedSessions, getSessionGroupId, mergeLinkedSessions } from '../../utils/sessionGroups';
+import { getLinkedSessions, getSessionGroupId, mergeLinkedSessions, mergeSessionGroup } from '../../utils/sessionGroups';
 import AddTimeline from './components/AddTimeline';
 import SessionModal from './components/SessionModal';
 import { createStyles } from './AddScreenStyles';
 
 const QUICK_MINUTES = [15, 30, 45, 60];
 const DRAG_ACTIVATION_DISTANCE = 8;
+const MAX_SESSION_MINUTES = 24 * 60;
 
 type TimelineRowMeasurement = {
   pageY: number;
@@ -82,6 +83,7 @@ export default function AddScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { settings } = useAppSettings();
   const {
+    entries,
     deleteWalkingSession,
     getEntryForDate,
     restoreWalkingSessions,
@@ -117,20 +119,21 @@ export default function AddScreen() {
   const canEditSelectedDate = selectedKey <= currentDateKey;
   const canGoForward = !isCurrentDate;
   const selectedEntry = getEntryForDate(selectedKey);
-  const logicalSessions = useMemo(
+  const allSessions = useMemo(() => entries.flatMap((entry) => entry.sessions), [entries]);
+  const selectedDayLogicalSessions = useMemo(
     () => mergeLinkedSessions(selectedEntry?.sessions ?? []),
     [selectedEntry?.sessions],
   );
   const totalMinutes = selectedEntry?.totalMinutes ?? 0;
   const averageSessionLength = useMemo(() => {
-    const sessions = logicalSessions;
+    const sessions = selectedDayLogicalSessions;
 
     if (!sessions.length) {
       return 0;
     }
 
     return Math.round(sessions.reduce((total, session) => total + session.minutes, 0) / sessions.length);
-  }, [logicalSessions]);
+  }, [selectedDayLogicalSessions]);
   const pendingDeleteSessions = useMemo(() => {
     if (!sessionPendingDelete) {
       return [] as WalkingSession[];
@@ -139,22 +142,69 @@ export default function AddScreen() {
     return getLinkedSessions(selectedEntry?.sessions ?? [], sessionPendingDelete);
   }, [selectedEntry?.sessions, sessionPendingDelete]);
 
-  const groupedTimeline = useMemo(() => {
-    const groups = new Map<number, WalkingSession[]>();
+  const selectedGroupSessions = useMemo(() => {
+    const targetGroupIds = new Set((selectedEntry?.sessions ?? []).map((session) => getSessionGroupId(session)));
 
-    logicalSessions.forEach((session) => {
-      const hour = new Date(session.createdAt).getHours();
+    return allSessions.reduce<Map<string, WalkingSession[]>>((accumulator, session) => {
+      const groupId = getSessionGroupId(session);
+
+      if (!targetGroupIds.has(groupId)) {
+        return accumulator;
+      }
+
+      const existingSessions = accumulator.get(groupId) ?? [];
+      accumulator.set(groupId, [...existingSessions, session]);
+      return accumulator;
+    }, new Map());
+  }, [allSessions, selectedEntry?.sessions]);
+
+  const groupedTimeline = useMemo(() => {
+    const groups = new Map<number, Array<{
+      displayMinutes: number;
+      id: string;
+      logicalSession: WalkingSession;
+      segment: WalkingSession;
+    }>>();
+
+    (selectedEntry?.sessions ?? []).forEach((segment) => {
+      const groupId = getSessionGroupId(segment);
+      const logicalSession = mergeSessionGroup(selectedGroupSessions.get(groupId) ?? []);
+
+      if (!logicalSession) {
+        return;
+      }
+
+      const hour = new Date(segment.createdAt).getHours();
       const existingSessions = groups.get(hour) ?? [];
-      groups.set(hour, [...existingSessions, session]);
+      groups.set(hour, [
+        ...existingSessions,
+        {
+          displayMinutes: segment.minutes,
+          id: `${groupId}-${segment.id}`,
+          logicalSession,
+          segment,
+        },
+      ]);
     });
 
     return visibleHours.map((hour) => ({
       hour,
       sessions: [...(groups.get(hour) ?? [])].sort(
-        (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+        (left, right) => new Date(left.segment.createdAt).getTime() - new Date(right.segment.createdAt).getTime(),
       ),
     }));
-  }, [logicalSessions, visibleHours]);
+  }, [selectedEntry?.sessions, selectedGroupSessions, visibleHours]);
+
+  const suggestedStartMinutes = useMemo(
+    () =>
+      new Map(
+        visibleHours.map((hour) => [
+          hour,
+          getSuggestedStartMinute(selectedKey, hour, allSessions, 30),
+        ]),
+      ),
+    [allSessions, selectedKey, visibleHours],
+  );
 
   const setCreateDrag = (nextDragState: CreateDragState | null) => {
     createDragRef.current = nextDragState;
@@ -401,7 +451,12 @@ export default function AddScreen() {
         return defaultTargetHour;
       }
 
-      const nextIndex = (currentIndex + delta + visibleHours.length) % visibleHours.length;
+      const nextIndex = currentIndex + delta;
+
+      if (nextIndex < 0 || nextIndex >= visibleHours.length) {
+        return currentValue;
+      }
+
       return visibleHours[nextIndex] ?? currentValue;
     });
   };
@@ -409,16 +464,31 @@ export default function AddScreen() {
   const shiftTargetMinute = (delta: -1 | 1) => {
     setTargetMinute((currentValue) => {
       const nextMinute = currentValue + delta;
+      const currentHourIndex = visibleHours.indexOf(targetHour);
 
       if (nextMinute < 0) {
-        setTargetHour((currentValueHour) => normalizeHour(currentValueHour - 1));
+        const previousHour = currentHourIndex > 0 ? visibleHours[currentHourIndex - 1] : null;
+
+        if (previousHour === null || previousHour === undefined) {
+          return currentValue;
+        }
+
+        setTargetHour(previousHour);
+        return 59;
       }
 
       if (nextMinute > 59) {
-        setTargetHour((currentValueHour) => normalizeHour(currentValueHour + 1));
+        const nextHour = currentHourIndex >= 0 ? visibleHours[currentHourIndex + 1] : null;
+
+        if (nextHour === null || nextHour === undefined) {
+          return currentValue;
+        }
+
+        setTargetHour(nextHour);
+        return 0;
       }
 
-      return normalizeMinute(nextMinute);
+      return nextMinute;
     });
   };
 
@@ -437,9 +507,20 @@ export default function AddScreen() {
       return;
     }
 
-    const startMinute = getSuggestedStartMinute(selectedHours[0], selectedEntry?.sessions ?? []);
+    const startMinute = getSuggestedStartMinute(
+      selectedKey,
+      selectedHours[0],
+      allSessions,
+      selectedHours.length * 60,
+    );
+
+    if (startMinute === null) {
+      await showWarningToast('A walking session already exists in one or more of those hourly slots.');
+      return;
+    }
+
     const nextSegments = buildSessionSegments(selectedHours.length * 60, selectedHours[0], startMinute);
-    const hasOverlap = doesTimeRangeCollide(selectedKey, selectedEntry?.sessions ?? [], nextSegments);
+    const hasOverlap = doesTimeRangeCollide(selectedKey, allSessions, nextSegments);
 
     if (hasOverlap) {
       await showWarningToast('A walking session already exists in one or more of those hourly slots.');
@@ -470,7 +551,7 @@ export default function AddScreen() {
     );
     const hasOverlap = doesTimeRangeCollide(
       selectedKey,
-      selectedEntry?.sessions ?? [],
+      allSessions,
       nextSegments,
       [getSessionGroupId(activeDrag.session)],
     );
@@ -602,10 +683,16 @@ export default function AddScreen() {
       return;
     }
 
+    if (parsedMinutes > MAX_SESSION_MINUTES) {
+      pushToast(`Please keep sessions under ${formatDuration(MAX_SESSION_MINUTES)}.`, 'warning');
+      await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
     const nextSegments = buildSessionSegments(parsedMinutes, targetHour, targetMinute);
     const hasOverlap = doesTimeRangeCollide(
       selectedKey,
-      selectedEntry?.sessions ?? [],
+      allSessions,
       nextSegments,
       editingSession ? [getSessionGroupId(editingSession)] : [],
     );
@@ -624,11 +711,7 @@ export default function AddScreen() {
       return;
     }
 
-    const batchId = `${selectedKey}-${targetHour}-${Date.now()}`;
-
-    for (const segment of nextSegments) {
-      await saveWalkingSession(selectedKey, segment.minutes, segment.hour, segment.minute, batchId);
-    }
+    await saveWalkingSession(selectedKey, parsedMinutes, targetHour, targetMinute);
 
     closeModal();
     pushToast(`Added ${formatDateKeyTimeRange(selectedKey, targetHour, targetMinute, parsedMinutes)}.`, 'success');
@@ -673,7 +756,9 @@ export default function AddScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryValueWrap}>
               <Text style={styles.summaryLabel}>Selected day total</Text>
-              <Text style={styles.summaryValue}>{formatDuration(totalMinutes)}</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.summaryValue}>
+                {formatDuration(totalMinutes)}
+              </Text>
             </View>
             <View style={styles.summaryRingWrap}>
               <GoalProgressRing
@@ -687,7 +772,7 @@ export default function AddScreen() {
             </View>
             <View style={styles.summaryMetaWrap}>
               <Text style={styles.summaryMeta}>
-                {logicalSessions.length} session{logicalSessions.length === 1 ? '' : 's'}
+                {selectedDayLogicalSessions.length} session{selectedDayLogicalSessions.length === 1 ? '' : 's'}
               </Text>
               <Text style={styles.summaryMetaSecondary}>
                 Avg {averageSessionLength ? formatDuration(averageSessionLength) : '—'}
@@ -716,10 +801,10 @@ export default function AddScreen() {
             onOpenEditModal={openEditModal}
             onOpenModal={openModal}
             onRowLayout={handleTimelineRowLayout}
-            selectedSessions={selectedEntry?.sessions ?? []}
             setRowRef={(hour, node) => {
               timelineRowRefs.current[hour] = node;
             }}
+            suggestedStartMinutes={suggestedStartMinutes}
             styles={styles}
           />
         </ScrollView>
@@ -728,7 +813,7 @@ export default function AddScreen() {
       {canEditSelectedDate ? (
         <Pressable accessibilityLabel="Add walking session" accessibilityRole="button" onPress={() => openModal()} style={styles.floatingBarWrap}>
           <View style={styles.floatingBar}>
-            <Ionicons color={colors.textPrimary} name="add" size={22} />
+            <Ionicons color={colors.textPrimary} name="add" size={24} />
             <Text style={styles.floatingBarText}>Add walking session</Text>
           </View>
         </Pressable>

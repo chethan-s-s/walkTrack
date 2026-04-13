@@ -33,10 +33,10 @@ export const createStyles = (colors: AppColors) =>
     goalsCard: {
       backgroundColor: colors.surface,
       borderRadius: 28,
-      padding: 18,
+      padding: 16,
       borderWidth: 1,
       borderColor: colors.border,
-      gap: 16,
+      gap: 14,
     },
     goalsTopRow: {
       flexDirection: 'row',
@@ -45,7 +45,8 @@ export const createStyles = (colors: AppColors) =>
     },
     goalsTextWrap: {
       flex: 1,
-      gap: 10,
+      gap: 8,
+      minWidth: 0,
     },
     goalEyebrow: {
       color: colors.textMuted,
@@ -67,11 +68,12 @@ export const createStyles = (colors: AppColors) =>
     streakPill: {
       alignSelf: 'flex-start',
       borderRadius: 999,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
       backgroundColor: colors.surfaceAlt,
       borderWidth: 1,
       borderColor: colors.border,
+      maxWidth: '100%',
     },
     streakText: {
       color: colors.textPrimary,
@@ -127,7 +129,7 @@ export const createStyles = (colors: AppColors) =>
       width: '48%',
       backgroundColor: colors.surface,
       borderRadius: 24,
-      padding: 16,
+      padding: 14,
       borderWidth: 1,
       borderColor: colors.border,
       gap: 8,
@@ -188,6 +190,7 @@ export const createStyles = (colors: AppColors) =>
       borderRadius: 20,
       padding: 14,
       gap: 6,
+      minWidth: 0,
     },
     insightTileWide: {
       width: '100%',

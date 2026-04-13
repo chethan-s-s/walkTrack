@@ -5,6 +5,25 @@ export const getSessionGroupId = (session: WalkingSession) => session.batchId ??
 const sortByCreatedAtAscending = (sessions: WalkingSession[]) =>
   [...sessions].sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
 
+export const mergeSessionGroup = (sessions: WalkingSession[]) => {
+  const sortedSessions = sortByCreatedAtAscending(sessions);
+  const firstSession = sortedSessions[0];
+
+  if (!firstSession) {
+    return null;
+  }
+
+  const groupId = getSessionGroupId(firstSession);
+
+  return {
+    ...firstSession,
+    id: groupId,
+    batchId: groupId,
+    minutes: sortedSessions.reduce((total, session) => total + session.minutes, 0),
+    createdAt: firstSession.createdAt,
+  } as WalkingSession;
+};
+
 export const getLinkedSessions = (sessions: WalkingSession[], targetSession: WalkingSession | string) => {
   const targetGroupId = typeof targetSession === 'string' ? targetSession : getSessionGroupId(targetSession);
 
@@ -22,17 +41,9 @@ export const mergeLinkedSessions = (sessions: WalkingSession[]) => {
   }, new Map());
 
   return [...groups.entries()]
-    .map(([groupId, groupedSessions]) => {
-      const sortedSessions = sortByCreatedAtAscending(groupedSessions);
-      const firstSession = sortedSessions[0];
-
-      return {
-        ...firstSession,
-        id: groupId,
-        batchId: groupId,
-        minutes: sortedSessions.reduce((total, session) => total + session.minutes, 0),
-        createdAt: firstSession.createdAt,
-      } as WalkingSession;
+    .flatMap(([, groupedSessions]) => {
+      const mergedSession = mergeSessionGroup(groupedSessions);
+      return mergedSession ? [mergedSession] : [];
     })
     .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
 };

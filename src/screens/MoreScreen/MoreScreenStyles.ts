@@ -105,6 +105,7 @@ export const createStyles = (colors: AppColors) =>
     },
     segmentedButton: {
       flex: 1,
+      minWidth: 0,
       minHeight: 42,
       borderRadius: 16,
       backgroundColor: colors.actionSurface,
@@ -138,9 +139,9 @@ export const createStyles = (colors: AppColors) =>
       gap: 8,
     },
     stepperButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: colors.actionSurface,
       borderWidth: 1,
       borderColor: colors.actionBorder,

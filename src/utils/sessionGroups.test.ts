@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getLinkedSessions, mergeLinkedSessions } from './sessionGroups';
+import { getLinkedSessions, mergeLinkedSessions, mergeSessionGroup } from './sessionGroups';
 import { doesTimeRangeCollide } from './time';
 import { getDateKey } from '../storage/walkingStorage';
 
@@ -59,4 +59,33 @@ test('getLinkedSessions and collision exclusion work with logical session ids', 
     doesTimeRangeCollide(dateKey, splitSessions, [{ hour: 21, minute: 35, minutes: 60 }], ['walk-2']),
     false,
   );
+});
+
+test('mergeSessionGroup returns the full logical session for any linked subset', () => {
+  const firstDay = getDateKey(new Date(2026, 3, 13));
+  const secondDay = getDateKey(new Date(2026, 3, 14));
+  const merged = mergeSessionGroup([
+    {
+      id: 'walk-3',
+      batchId: 'walk-3',
+      date: firstDay,
+      minutes: 30,
+      createdAt: new Date(2026, 3, 13, 23, 30).toISOString(),
+    },
+    {
+      id: 'walk-3-1',
+      batchId: 'walk-3',
+      date: secondDay,
+      minutes: 60,
+      createdAt: new Date(2026, 3, 14, 0, 0).toISOString(),
+    },
+  ]);
+
+  assert.deepEqual(merged, {
+    id: 'walk-3',
+    batchId: 'walk-3',
+    date: firstDay,
+    minutes: 90,
+    createdAt: new Date(2026, 3, 13, 23, 30).toISOString(),
+  });
 });

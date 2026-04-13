@@ -158,25 +158,33 @@ export default function HomeScreen() {
           <View style={styles.insightGrid}>
             <View style={styles.insightTile}>
               <Text style={styles.insightLabel}>Best day</Text>
-              <Text style={styles.insightValue}>{bestDay ? formatDuration(bestDay.totalMinutes) : '—'}</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {bestDay ? formatDuration(bestDay.totalMinutes) : '—'}
+              </Text>
               <Text style={styles.insightMeta}>{bestDay ? formatEntryDate(bestDay.date) : 'No data yet'}</Text>
             </View>
 
             <View style={styles.insightTile}>
               <Text style={styles.insightLabel}>Avg session</Text>
-              <Text style={styles.insightValue}>{formatDuration(averageSessionLength)}</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {formatDuration(averageSessionLength)}
+              </Text>
               <Text style={styles.insightMeta}>Across all sessions</Text>
             </View>
 
             <View style={styles.insightTile}>
               <Text style={styles.insightLabel}>This week</Text>
-              <Text style={styles.insightValue}>{formatDuration(weeklyMinutes)}</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {formatDuration(weeklyMinutes)}
+              </Text>
               <Text style={styles.insightMeta}>Total logged this week</Text>
             </View>
 
             <View style={styles.insightTile}>
               <Text style={styles.insightLabel}>This month</Text>
-              <Text style={styles.insightValue}>{formatDuration(totalMinutesThisMonth)}</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {formatDuration(totalMinutesThisMonth)}
+              </Text>
               <Text style={styles.insightMeta}>Total logged this month</Text>
             </View>
           </View>
@@ -192,7 +200,9 @@ export default function HomeScreen() {
 
               return (
                 <View key={bar.key} style={styles.barColumn}>
-                  <Text style={styles.barMinutes}>{formatDuration(bar.minutes)}</Text>
+                  <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.barMinutes}>
+                    {formatDuration(bar.minutes)}
+                  </Text>
                   <View style={styles.barTrack}>
                     <View style={[styles.barFill, { height }]} />
                   </View>
@@ -376,12 +386,14 @@ export default function HomeScreen() {
 
             <View style={styles.goalsTextWrap}>
               <Text style={styles.goalEyebrow}>Daily Goal</Text>
-              <Text style={styles.goalHeadline}>{formatDuration(todayMinutes)} / {formatDuration(settings.dailyGoalMinutes)}</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.goalHeadline}>
+                {formatDuration(todayMinutes)} / {formatDuration(settings.dailyGoalMinutes)}
+              </Text>
               <Text style={styles.goalMeta}>
                 {weeklyGoalHits}/7 days hit · Weekly target {settings.weeklyGoalDays} days
               </Text>
               <View style={styles.streakPill}>
-                <Text style={styles.streakText}>
+                <Text ellipsizeMode="tail" numberOfLines={1} style={styles.streakText}>
                   {currentStreak > 0
                     ? `${currentStreak}-day streak`
                     : weeklyGoalHits >= settings.weeklyGoalDays
@@ -411,12 +423,16 @@ export default function HomeScreen() {
         <View style={styles.statGrid}>
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Today</Text>
-            <Text style={styles.cardValue}>{formatDuration(todayMinutes)}</Text>
+            <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.cardValue}>
+              {formatDuration(todayMinutes)}
+            </Text>
             <Text style={styles.cardMeta}>{isGoalReached ? 'Goal reached' : `${formatDuration(remainingGoalMinutes)} left`}</Text>
           </View>
           <View style={styles.card}>
             <Text style={styles.cardLabel}>This week</Text>
-            <Text style={styles.cardValue}>{formatDuration(weeklyMinutes)}</Text>
+            <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.cardValue}>
+              {formatDuration(weeklyMinutes)}
+            </Text>
             <Text style={styles.cardMeta}>{weeklyGoalHits}/7 goal days hit</Text>
           </View>
         </View>

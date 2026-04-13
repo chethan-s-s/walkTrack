@@ -152,16 +152,18 @@ export default function HistoryScreen() {
         renderItem={({ item }) => (
           <Pressable accessibilityRole="button" onPress={() => toggleExpanded(item.date)} style={styles.rowCard}>
             <View style={styles.rowTop}>
-              <View>
-                <Text style={styles.rowDate}>{formatHistoryDate(item.date)}</Text>
-                <Text style={styles.rowMeta}>
+              <View style={styles.rowTextWrap}>
+                <Text ellipsizeMode="tail" numberOfLines={1} style={styles.rowDate}>{formatHistoryDate(item.date)}</Text>
+                <Text ellipsizeMode="tail" numberOfLines={2} style={styles.rowMeta}>
                   {item.sessions.length} session{item.sessions.length > 1 ? 's' : ''} · Last saved{' '}
                   {new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </Text>
               </View>
               <View style={styles.rowChevronWrap}>
                 <LinearGradient colors={[colors.textPrimary, colors.accentMuted]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.minutesPill}>
-                  <Text style={styles.minutesText}>{formatDuration(item.totalMinutes)}</Text>
+                  <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.minutesText}>
+                    {formatDuration(item.totalMinutes)}
+                  </Text>
                 </LinearGradient>
                 <Ionicons
                   color={colors.textMuted}

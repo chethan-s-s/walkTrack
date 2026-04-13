@@ -130,7 +130,9 @@ export default function SessionModal({
                     <Ionicons color={colors.textPrimary} name="remove" size={16} />
                   </Pressable>
                   <View style={styles.timeAdjustCenter}>
-                    <Text style={styles.timeAdjustLabel}>{String(targetMinute).padStart(2, '0')}</Text>
+                    <Text adjustsFontSizeToFit numberOfLines={1} style={styles.timeAdjustLabel}>
+                      {String(targetMinute).padStart(2, '0')}
+                    </Text>
                   </View>
                   <Pressable
                     accessibilityLabel="Increase minute"
@@ -178,7 +180,14 @@ export default function SessionModal({
                   onPress={() => onChangeDraftMinutes(String(value))}
                   style={[styles.quickChip, active && styles.quickChipActive]}
                 >
-                  <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>{value} min</Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="tail"
+                    numberOfLines={1}
+                    style={[styles.quickChipText, active && styles.quickChipTextActive]}
+                  >
+                    {value} min
+                  </Text>
                 </Pressable>
               );
             })}
