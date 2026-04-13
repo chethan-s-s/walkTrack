@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   Switch,
@@ -10,9 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppSettings } from '../../context/AppSettingsContext';
+import { useWalkingData } from '../../context/WalkingDataContext';
 import { useAppColors } from '../../theme/useAppColors';
 import { DashboardSectionKey } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
+import { buildAppDataSnapshot, parseAppDataSnapshot } from '../../utils/dataTransfer';
 import { formatHourLabel, getTimelineSpanHours, isOvernightTimeline } from '../../utils/time';
 import { createStyles } from './MoreScreenStyles';
 
@@ -48,13 +52,56 @@ const DASHBOARD_SECTION_DETAILS: Record<DashboardSectionKey, { title: string; de
   },
 };
 
+type DocumentPickerAsset = {
+  uri: string;
+};
+
+type DocumentPickerResult = {
+  canceled: boolean;
+  assets: DocumentPickerAsset[];
+};
+
+type DocumentPickerModule = {
+  getDocumentAsync: (options: {
+    type: string;
+    copyToCacheDirectory: boolean;
+    multiple: boolean;
+  }) => Promise<DocumentPickerResult>;
+};
+
+type FileSystemModule = {
+  cacheDirectory: string | null;
+  EncodingType: {
+    UTF8: string;
+  };
+  writeAsStringAsync: (uri: string, contents: string, options: { encoding: string }) => Promise<void>;
+  readAsStringAsync: (uri: string, options: { encoding: string }) => Promise<string>;
+};
+
+type SharingModule = {
+  isAvailableAsync: () => Promise<boolean>;
+  shareAsync: (uri: string, options: { dialogTitle: string; mimeType: string }) => Promise<void>;
+};
+
+const loadDataTransferModules = () => ({
+  documentPickerModule: require('expo-document-picker') as DocumentPickerModule,
+  fileSystemModule: require('expo-file-system/legacy') as FileSystemModule,
+  sharingModule: require('expo-sharing') as SharingModule,
+});
+
 export default function MoreScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [generalOpen, setGeneralOpen] = useState(true);
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [dataStatus, setDataStatus] = useState<string | null>(null);
+  const [transferNotification, setTransferNotification] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const {
     moveDashboardSection,
+    replaceSettings,
     setDailyGoalMinutes,
     setGoalReminderEnabled,
     setHapticsEnabled,
@@ -65,6 +112,7 @@ export default function MoreScreen() {
     settings,
     toggleDashboardSectionHidden,
   } = useAppSettings();
+  const { entries, replaceWalkingEntries } = useWalkingData();
   const isDailyGoalMinned = settings.dailyGoalMinutes <= MIN_DAILY_GOAL_MINUTES;
   const isDailyGoalMaxed = settings.dailyGoalMinutes >= MAX_DAILY_GOAL_MINUTES;
   const isWeeklyGoalDaysMinned = settings.weeklyGoalDays <= MIN_WEEKLY_GOAL_DAYS;
@@ -76,11 +124,124 @@ export default function MoreScreen() {
       ? 'Single-hour range · start and end are the same'
       : `Same-day range · ${visibleTimelineHours} visible hour${visibleTimelineHours === 1 ? '' : 's'}`;
 
+  useEffect(() => {
+    if (!transferNotification) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      setTransferNotification(null);
+    }, 2600);
+
+    return () => clearTimeout(timeout);
+  }, [transferNotification]);
+
+  const showTransferNotification = (message: string) => {
+    setTransferNotification(message);
+  };
+
+  const handleExportData = async () => {
+    if (isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setDataStatus(null);
+
+    try {
+      const { fileSystemModule, sharingModule } = loadDataTransferModules();
+
+      if (!fileSystemModule.cacheDirectory) {
+        Alert.alert('Export unavailable', 'This device does not expose a writable cache directory.');
+        return;
+      }
+
+      const snapshot = buildAppDataSnapshot(entries, settings);
+      const fileUri = `${fileSystemModule.cacheDirectory}walk-track-backup-${snapshot.exportedAt.slice(0, 10)}.json`;
+
+      await fileSystemModule.writeAsStringAsync(fileUri, JSON.stringify(snapshot, null, 2), {
+        encoding: fileSystemModule.EncodingType.UTF8,
+      });
+
+      const canShare = await sharingModule.isAvailableAsync();
+
+      if (!canShare) {
+        setDataStatus('Backup created, but sharing is not available on this device.');
+        showTransferNotification('Backup exported.');
+        Alert.alert('Export complete', 'Your Walk Track backup file was created successfully.');
+        return;
+      }
+
+      await sharingModule.shareAsync(fileUri, {
+        dialogTitle: 'Export Walk Track data',
+        mimeType: 'application/json',
+      });
+
+      setDataStatus('Backup file ready to save or share.');
+        showTransferNotification('Backup exported.');
+        Alert.alert('Export complete', 'Your Walk Track backup file is ready to save or share.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to export your data.';
+      Alert.alert('Export failed', message);
+      setDataStatus(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportData = async () => {
+    if (isImporting) {
+      return;
+    }
+
+    setIsImporting(true);
+    setDataStatus(null);
+
+    try {
+      const { documentPickerModule, fileSystemModule } = loadDataTransferModules();
+
+      const result = await documentPickerModule.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets[0]?.uri) {
+        return;
+      }
+
+      const fileContents = await fileSystemModule.readAsStringAsync(result.assets[0].uri, {
+        encoding: fileSystemModule.EncodingType.UTF8,
+      });
+      const snapshot = parseAppDataSnapshot(fileContents);
+
+      await replaceWalkingEntries(snapshot.entries);
+      await replaceSettings(snapshot.settings);
+
+      setDataStatus(`Imported ${snapshot.entries.length} day${snapshot.entries.length === 1 ? '' : 's'} of walking data.`);
+      showTransferNotification('Backup imported.');
+      Alert.alert('Import complete', 'Your Walk Track data and settings were restored successfully.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to import the selected file.';
+      Alert.alert('Import failed', message);
+      setDataStatus(message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>More</Text>
         <Text style={styles.subtitle}>Settings and preferences.</Text>
+
+        {transferNotification ? (
+          <View style={styles.transferNotificationCard}>
+            <Ionicons color={colors.textPrimary} name="notifications-outline" size={18} />
+            <Text style={styles.transferNotificationText}>{transferNotification}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.sectionCard}>
           <Pressable onPress={() => setGeneralOpen((current) => !current)} style={styles.sectionHeaderButton}>
@@ -319,6 +480,64 @@ export default function MoreScreen() {
               </View>
             );
           }) : null}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Pressable onPress={() => setDataOpen((current) => !current)} style={styles.sectionHeaderButton}>
+            <View style={styles.sectionHeaderTextWrap}>
+              <Text style={styles.sectionTitle}>Data</Text>
+              <Text style={styles.sectionSubtitle}>Import or export your dashboard data and settings.</Text>
+            </View>
+            <Ionicons color={colors.textPrimary} name={dataOpen ? 'chevron-up' : 'chevron-down'} size={20} />
+          </Pressable>
+
+          {dataOpen ? (
+            <>
+              <View style={styles.dataRow}>
+                <View style={styles.rowTextWrap}>
+                  <Text style={styles.rowTitle}>Export backup</Text>
+                  <Text style={styles.rowDescription}>Create a JSON file with sessions and preferences.</Text>
+                </View>
+                <Pressable
+                  accessibilityLabel="Export app data"
+                  accessibilityRole="button"
+                  disabled={isExporting || isImporting}
+                  onPress={() => void handleExportData()}
+                  style={[styles.dataActionButton, (isExporting || isImporting) && styles.dataActionButtonDisabled]}
+                >
+                  {isExporting ? (
+                    <ActivityIndicator color={colors.textPrimary} size="small" />
+                  ) : (
+                    <Ionicons color={colors.textPrimary} name="share-outline" size={18} />
+                  )}
+                  <Text style={styles.dataActionButtonText}>Export</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.dataRow}>
+                <View style={styles.rowTextWrap}>
+                  <Text style={styles.rowTitle}>Import backup</Text>
+                  <Text style={styles.rowDescription}>Restore entries and settings from a JSON backup file.</Text>
+                </View>
+                <Pressable
+                  accessibilityLabel="Import app data"
+                  accessibilityRole="button"
+                  disabled={isImporting || isExporting}
+                  onPress={() => void handleImportData()}
+                  style={[styles.dataActionButton, (isImporting || isExporting) && styles.dataActionButtonDisabled]}
+                >
+                  {isImporting ? (
+                    <ActivityIndicator color={colors.textPrimary} size="small" />
+                  ) : (
+                    <Ionicons color={colors.textPrimary} name="download-outline" size={18} />
+                  )}
+                  <Text style={styles.dataActionButtonText}>Import</Text>
+                </Pressable>
+              </View>
+
+              {dataStatus ? <Text style={styles.dataStatusText}>{dataStatus}</Text> : null}
+            </>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>

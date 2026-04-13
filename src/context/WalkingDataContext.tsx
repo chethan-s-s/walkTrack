@@ -13,6 +13,7 @@ import {
   deleteSession,
   getDateKey,
   loadEntries,
+  replaceEntries,
   restoreSessions,
   updateStoredSession,
 } from '../storage/walkingStorage';
@@ -27,6 +28,7 @@ type WalkingDataContextValue = {
   saveWalkingSession: (date: string, minutes: number, hour?: number, minute?: number, batchId?: string) => Promise<void>;
   deleteWalkingSession: (date: string, session: WalkingSession) => Promise<void>;
   restoreWalkingSessions: (sessions: WalkingSession[]) => Promise<void>;
+  replaceWalkingEntries: (nextEntries: WalkingEntry[]) => Promise<void>;
   updateWalkingSession: (date: string, sessionId: string, nextDate: string, minutes: number, hour: number, minute?: number) => Promise<void>;
   getEntryForDate: (date: string) => WalkingEntry | undefined;
 };
@@ -60,6 +62,11 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
   const restoreWalkingSessions = useCallback(async (sessions: WalkingSession[]) => {
     const nextEntries = await restoreSessions(sessions);
     setEntries(nextEntries);
+  }, []);
+
+  const replaceWalkingEntries = useCallback(async (nextEntries: WalkingEntry[]) => {
+    const savedEntries = await replaceEntries(nextEntries);
+    setEntries(savedEntries);
   }, []);
 
   const updateWalkingSession = useCallback(
@@ -108,6 +115,7 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
       averageMinutes,
       deleteWalkingSession,
       saveWalkingSession,
+      replaceWalkingEntries,
       restoreWalkingSessions,
       updateWalkingSession,
       getEntryForDate,
@@ -118,6 +126,7 @@ export function WalkingDataProvider({ children }: PropsWithChildren) {
       entries,
       getEntryForDate,
       loading,
+      replaceWalkingEntries,
       restoreWalkingSessions,
       saveWalkingSession,
       todayMinutes,

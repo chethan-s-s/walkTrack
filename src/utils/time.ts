@@ -1,4 +1,5 @@
 import { WalkingSession } from '../types';
+import { getSessionGroupId } from './sessionGroups';
 import { getDateKey } from '../storage/walkingStorage';
 
 export type TimeSegment = {
@@ -215,7 +216,7 @@ export const doesTimeRangeCollide = (
     const nextEnd = new Date(nextStart.getTime() + segment.minutes * 60_000);
 
     return sessions
-      .filter((session) => !excludedIds.has(session.id))
+      .filter((session) => !excludedIds.has(getSessionGroupId(session)))
       .some((session) => {
         const existingStart = new Date(session.createdAt);
         const existingEnd = new Date(existingStart.getTime() + session.minutes * 60_000);

@@ -14,6 +14,7 @@ import { defaultSettings, saveSettings, loadSettings } from '../storage/settings
 type AppSettingsContextValue = {
   settings: UserSettings;
   settingsLoading: boolean;
+  replaceSettings: (nextSettings: UserSettings) => Promise<void>;
   setWeekStart: (value: WeekStartDay) => Promise<void>;
   setDailyGoalMinutes: (value: number) => Promise<void>;
   setWeeklyGoalDays: (value: number) => Promise<void>;
@@ -63,6 +64,13 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
         ...currentSettings,
         weekStart: value,
       }));
+    },
+    [updateSettings],
+  );
+
+  const replaceSettings = useCallback(
+    async (nextSettings: UserSettings) => {
+      await updateSettings(() => nextSettings);
     },
     [updateSettings],
   );
@@ -195,6 +203,7 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
     () => ({
       settings,
       settingsLoading,
+      replaceSettings,
       setWeekStart,
       setDailyGoalMinutes,
       setWeeklyGoalDays,
@@ -209,6 +218,7 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
     }),
     [
       moveDashboardSection,
+      replaceSettings,
       setDailyGoalMinutes,
       setGoalReminderEnabled,
       setHapticsEnabled,

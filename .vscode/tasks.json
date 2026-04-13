@@ -1,0 +1,53 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "test walking tracker",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"test"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "test walking tracker after storage fix",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"test"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "install expo data packages",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"expo-document-picker",
+				"expo-file-system",
+				"expo-sharing"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "final test walking tracker",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"test"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "test walking tracker with notifications",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"test"
+			],
+			"isBackground": false
+		}
+	]
+}

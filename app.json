@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "walking-tracker",
-    "slug": "walking-tracker",
+    "name": "Walk Track",
+    "slug": "walk-track",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,6 +23,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.chethans.walkingtracker",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#18181b"

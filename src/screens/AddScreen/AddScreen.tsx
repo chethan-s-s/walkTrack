@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
   Modal,
@@ -11,6 +11,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import GoalProgressRing from '../../components/GoalProgressRing';
 import { useTimelineHours } from '../../hooks/useTimelineHours';
@@ -33,6 +34,7 @@ import {
   normalizeHour,
   normalizeMinute,
 } from '../../utils/time';
+import { getLinkedSessions, getSessionGroupId, mergeLinkedSessions } from '../../utils/sessionGroups';
 import AddTimeline from './components/AddTimeline';
 import SessionModal from './components/SessionModal';
 import { createStyles } from './AddScreenStyles';
@@ -99,6 +101,7 @@ export default function AddScreen() {
   const [targetHour, setTargetHour] = useState(() => defaultTargetHour);
   const [targetMinute, setTargetMinute] = useState(getDefaultTargetMinute());
   const [toastItems, setToastItems] = useState<ToastMessage[]>([]);
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [rowMeasurements, setRowMeasurements] = useState<Record<number, TimelineRowMeasurement>>({});
   const [createDragState, setCreateDragState] = useState<CreateDragState | null>(null);
   const [moveDragState, setMoveDragState] = useState<MoveDragState | null>(null);
@@ -108,39 +111,38 @@ export default function AddScreen() {
   const toastIdRef = useRef(0);
 
   const selectedKey = useMemo(() => getDateKey(selectedDate), [selectedDate]);
-  const isCurrentDate = selectedKey === getDateKey();
-  const currentHour = new Date().getHours();
-  const canEditSelectedDate = selectedKey <= getDateKey();
+  const currentDateKey = getDateKey(currentDateTime);
+  const isCurrentDate = selectedKey === currentDateKey;
+  const currentHour = currentDateTime.getHours();
+  const canEditSelectedDate = selectedKey <= currentDateKey;
   const canGoForward = !isCurrentDate;
   const selectedEntry = getEntryForDate(selectedKey);
+  const logicalSessions = useMemo(
+    () => mergeLinkedSessions(selectedEntry?.sessions ?? []),
+    [selectedEntry?.sessions],
+  );
   const totalMinutes = selectedEntry?.totalMinutes ?? 0;
   const averageSessionLength = useMemo(() => {
-    const sessions = selectedEntry?.sessions ?? [];
+    const sessions = logicalSessions;
 
     if (!sessions.length) {
       return 0;
     }
 
     return Math.round(sessions.reduce((total, session) => total + session.minutes, 0) / sessions.length);
-  }, [selectedEntry?.sessions]);
+  }, [logicalSessions]);
   const pendingDeleteSessions = useMemo(() => {
     if (!sessionPendingDelete) {
       return [] as WalkingSession[];
     }
 
-    return (selectedEntry?.sessions ?? []).filter((session) => {
-      if (sessionPendingDelete.batchId) {
-        return session.batchId === sessionPendingDelete.batchId;
-      }
-
-      return session.id === sessionPendingDelete.id;
-    });
+    return getLinkedSessions(selectedEntry?.sessions ?? [], sessionPendingDelete);
   }, [selectedEntry?.sessions, sessionPendingDelete]);
 
   const groupedTimeline = useMemo(() => {
     const groups = new Map<number, WalkingSession[]>();
 
-    selectedEntry?.sessions.forEach((session) => {
+    logicalSessions.forEach((session) => {
       const hour = new Date(session.createdAt).getHours();
       const existingSessions = groups.get(hour) ?? [];
       groups.set(hour, [...existingSessions, session]);
@@ -152,7 +154,7 @@ export default function AddScreen() {
         (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
       ),
     }));
-  }, [selectedEntry, visibleHours]);
+  }, [logicalSessions, visibleHours]);
 
   const setCreateDrag = (nextDragState: CreateDragState | null) => {
     createDragRef.current = nextDragState;
@@ -193,6 +195,20 @@ export default function AddScreen() {
 
     return () => clearTimeout(timeout);
   }, [undoSessions]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setCurrentDateTime(new Date());
+    }, []),
+  );
 
   useEffect(() => {
     setCreateDrag(null);
@@ -456,7 +472,7 @@ export default function AddScreen() {
       selectedKey,
       selectedEntry?.sessions ?? [],
       nextSegments,
-      [activeDrag.session.id],
+      [getSessionGroupId(activeDrag.session)],
     );
 
     if (hasOverlap) {
@@ -541,11 +557,7 @@ export default function AddScreen() {
     }
 
     const deletedSessions = (selectedEntry?.sessions ?? []).filter((session) => {
-      if (sessionPendingDelete.batchId) {
-        return session.batchId === sessionPendingDelete.batchId;
-      }
-
-      return session.id === sessionPendingDelete.id;
+      return getSessionGroupId(session) === getSessionGroupId(sessionPendingDelete);
     });
 
     await deleteWalkingSession(selectedKey, sessionPendingDelete);
@@ -595,7 +607,7 @@ export default function AddScreen() {
       selectedKey,
       selectedEntry?.sessions ?? [],
       nextSegments,
-      editingSession ? [editingSession.id] : [],
+      editingSession ? [getSessionGroupId(editingSession)] : [],
     );
 
     if (hasOverlap) {
@@ -675,7 +687,7 @@ export default function AddScreen() {
             </View>
             <View style={styles.summaryMetaWrap}>
               <Text style={styles.summaryMeta}>
-                {selectedEntry?.sessions.length ?? 0} session{(selectedEntry?.sessions.length ?? 0) === 1 ? '' : 's'}
+                {logicalSessions.length} session{logicalSessions.length === 1 ? '' : 's'}
               </Text>
               <Text style={styles.summaryMetaSecondary}>
                 Avg {averageSessionLength ? formatDuration(averageSessionLength) : '—'}

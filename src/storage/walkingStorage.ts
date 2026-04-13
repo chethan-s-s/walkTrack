@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { WalkingEntry, WalkingSession } from '../types';
+import { getSessionGroupId } from '../utils/sessionGroups';
 
 const STORAGE_KEY = 'walking-tracker/entries-v1';
 
@@ -13,6 +14,16 @@ type LegacyWalkingEntry = {
 
 const sortSessions = (sessions: WalkingSession[]) =>
   [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+const parseDateKey = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const createSessionGroupId = (createdAt: string) => `${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createSessionSegmentId = (sessionGroupId: string, segmentIndex: number) =>
+  segmentIndex === 0 ? sessionGroupId : `${sessionGroupId}-${segmentIndex}`;
 
 const sortEntries = (entries: WalkingEntry[]) =>
   [...entries].sort((left, right) => {
@@ -48,7 +59,18 @@ const getTimestampForDate = (dateKey: string, hour?: number, minute?: number) =>
 
 const normalizeEntry = (entry: WalkingEntry | LegacyWalkingEntry): WalkingEntry => {
   if ('sessions' in entry && Array.isArray(entry.sessions)) {
-    const sessions = sortSessions(entry.sessions);
+    const sessions = sortSessions(
+      entry.sessions.map((session) => {
+        const groupId = session.batchId ?? session.id;
+
+        return {
+          ...session,
+          id: session.id,
+          batchId: groupId,
+        };
+      }),
+    );
+
     return {
       id: entry.id,
       date: entry.date,
@@ -89,6 +111,39 @@ const buildEntry = (date: string, sessions: WalkingSession[]): WalkingEntry => {
   };
 };
 
+const buildSplitSessions = (
+  date: string,
+  totalMinutes: number,
+  hour: number,
+  minute: number,
+  sessionGroupId: string,
+) => {
+  const segments: WalkingSession[] = [];
+  let remainingMinutes = totalMinutes;
+  let segmentCursor = new Date(parseDateKey(date).getFullYear(), parseDateKey(date).getMonth(), parseDateKey(date).getDate(), hour, minute, 0, 0);
+  let segmentIndex = 0;
+
+  while (remainingMinutes > 0) {
+    const availableMinutes = 60 - segmentCursor.getMinutes();
+    const segmentMinutes = Math.min(remainingMinutes, availableMinutes);
+    const segmentDate = getDateKey(segmentCursor);
+
+    segments.push({
+      id: createSessionSegmentId(sessionGroupId, segmentIndex),
+      batchId: sessionGroupId,
+      date: segmentDate,
+      minutes: segmentMinutes,
+      createdAt: segmentCursor.toISOString(),
+    });
+
+    remainingMinutes -= segmentMinutes;
+    segmentIndex += 1;
+    segmentCursor = new Date(segmentCursor.getTime() + segmentMinutes * 60_000);
+  }
+
+  return segments;
+};
+
 export async function loadEntries(): Promise<WalkingEntry[]> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
 
@@ -114,9 +169,10 @@ export async function appendEntry(
   const entries = await loadEntries();
   const existingEntry = entries.find((entry) => entry.date === date);
   const createdAt = getTimestampForDate(date, hour, minute);
+  const sessionGroupId = batchId ?? createSessionGroupId(createdAt);
   const nextSession: WalkingSession = {
-    id: `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
-    batchId,
+    id: batchId ? `${sessionGroupId}-${Math.random().toString(36).slice(2, 8)}` : sessionGroupId,
+    batchId: sessionGroupId,
     date,
     minutes,
     createdAt,
@@ -146,19 +202,32 @@ export async function deleteSession(
   batchId?: string,
 ): Promise<WalkingEntry[]> {
   const entries = await loadEntries();
+
+  if (batchId) {
+    const nextEntries = entries
+      .map((entry) => {
+        const remainingSessions = entry.sessions.filter((session) => session.batchId !== batchId);
+
+        if (!remainingSessions.length) {
+          return null;
+        }
+
+        return buildEntry(entry.date, remainingSessions);
+      })
+      .filter((entry): entry is WalkingEntry => entry !== null);
+
+    const sortedEntries = sortEntries(nextEntries);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sortedEntries));
+    return sortedEntries;
+  }
+
   const existingEntry = entries.find((entry) => entry.date === date);
 
   if (!existingEntry) {
     return entries;
   }
 
-  const remainingSessions = existingEntry.sessions.filter((session) => {
-    if (batchId) {
-      return session.batchId !== batchId;
-    }
-
-    return session.id !== sessionId;
-  });
+  const remainingSessions = existingEntry.sessions.filter((session) => session.id !== sessionId);
 
   const nextEntries = remainingSessions.length
     ? sortEntries([
@@ -204,6 +273,12 @@ export async function restoreSessions(sessions: WalkingSession[]): Promise<Walki
   return sortedEntries;
 }
 
+export async function replaceEntries(entries: WalkingEntry[]): Promise<WalkingEntry[]> {
+  const normalizedEntries = sortEntries(entries.map(normalizeEntry));
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedEntries));
+  return normalizedEntries;
+}
+
 export async function updateStoredSession(
   date: string,
   sessionId: string,
@@ -213,42 +288,43 @@ export async function updateStoredSession(
   minute?: number,
 ): Promise<WalkingEntry[]> {
   const entries = await loadEntries();
-  const existingEntry = entries.find((entry) => entry.date === date);
+  const linkedSessions = entries.flatMap((entry) =>
+    entry.sessions.filter((session) => getSessionGroupId(session) === sessionId || session.id === sessionId),
+  );
 
-  if (!existingEntry) {
+  if (!linkedSessions.length) {
     return entries;
   }
 
-  const targetSession = existingEntry.sessions.find((session) => session.id === sessionId);
+  const orderedLinkedSessions = [...linkedSessions].sort(
+    (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+  );
+  const targetSession = orderedLinkedSessions[0];
 
   if (!targetSession) {
     return entries;
   }
 
-  const remainingSourceSessions = existingEntry.sessions.filter((session) => session.id !== sessionId);
-  const nextSession: WalkingSession = {
-    ...targetSession,
-    date: nextDate,
+  const linkedSessionIds = new Set(orderedLinkedSessions.map((session) => session.id));
+  const remainingSessions = entries.flatMap((entry) =>
+    entry.sessions.filter((session) => !linkedSessionIds.has(session.id)),
+  );
+  const rebuiltSessions = buildSplitSessions(
+    nextDate,
     minutes,
-    createdAt: getTimestampForDate(nextDate, hour, minute),
-  };
+    hour,
+    minute ?? new Date(targetSession.createdAt).getMinutes(),
+    getSessionGroupId(targetSession),
+  );
+  const groupedSessions = [...remainingSessions, ...rebuiltSessions].reduce<Record<string, WalkingSession[]>>(
+    (accumulator, session) => {
+      accumulator[session.date] = [...(accumulator[session.date] ?? []), session];
+      return accumulator;
+    },
+    {},
+  );
 
-  let nextEntries = entries.filter((entry) => entry.date !== date && entry.date !== nextDate);
-
-  if (date === nextDate) {
-    const rebuiltSessions = [...remainingSourceSessions, nextSession];
-
-    if (rebuiltSessions.length) {
-      nextEntries.push(buildEntry(date, rebuiltSessions));
-    }
-  } else {
-    if (remainingSourceSessions.length) {
-      nextEntries.push(buildEntry(date, remainingSourceSessions));
-    }
-
-    const targetEntry = entries.find((entry) => entry.date === nextDate);
-    nextEntries.push(buildEntry(nextDate, [...(targetEntry?.sessions ?? []), nextSession]));
-  }
+  const nextEntries = Object.entries(groupedSessions).map(([entryDate, dateSessions]) => buildEntry(entryDate, dateSessions));
 
   const sortedEntries = sortEntries(nextEntries);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sortedEntries));
