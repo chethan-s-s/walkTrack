@@ -627,7 +627,7 @@ export default function MoreScreen() {
           <Pressable onPress={() => setAboutOpen((current) => !current)} style={styles.sectionHeaderButton}>
             <View style={styles.sectionHeaderTextWrap}>
               <Text style={styles.sectionTitle}>About</Text>
-              <Text style={styles.sectionSubtitle}>Track walking sessions, goals, and history in one simple daily log.</Text>
+              <Text style={styles.sectionSubtitle}>Track walking minutes, view goals, and create history.</Text>
             </View>
             <Ionicons color={colors.textPrimary} name={aboutOpen ? 'chevron-up' : 'chevron-down'} size={20} />
           </Pressable>
