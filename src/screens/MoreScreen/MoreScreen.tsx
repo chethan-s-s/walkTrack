@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   Switch,
@@ -32,6 +33,59 @@ const TIMELINE_PRESETS = [
   { label: 'Overnight', start: 18, end: 6 },
   { label: 'Full day', start: 0, end: 23 },
 ];
+
+const PRIVACY_POLICY_TEXT = `Privacy Policy
+
+Walk Track is a simple walking tracker designed to help you log sessions, review progress, and manage personal goals.
+
+Information you enter into the app, such as walking sessions and preferences, is stored only for the purpose of running the app experience.
+
+At this stage, Walk Track does not provide a production privacy policy. This is placeholder content that will be replaced with a complete legal document later.
+
+When a full privacy policy is published, it will explain:
+
+- what data is stored
+- whether any data leaves your device
+- how backups, imports, and exports are handled
+- how to request updates or deletions if cloud features are added
+
+Until then, treat this screen as temporary product copy rather than final legal language.`;
+
+const TERMS_OF_SERVICE_TEXT = `Terms of Service
+
+Walk Track is provided as a simple walking log and goal-tracking application.
+
+These terms are currently placeholder text and will be replaced with the full terms of service later.
+
+For now, the intended use is straightforward:
+
+- use the app to log your own walking activity
+- review your progress and saved history
+- export and import your own backup data when needed
+
+Future terms will cover acceptable use, warranty disclaimers, liability limits, and any service-specific conditions if online features are added.
+
+Until a final legal version is added, this screen should be treated as a temporary draft.`;
+
+const ABOUT_ITEMS = [
+  {
+    key: 'privacy',
+    title: 'Privacy policy',
+    description: 'Privacy policy details will be added here later.',
+  },
+  {
+    key: 'terms',
+    title: 'Terms of service',
+    description: 'Terms of service details will be added here later.',
+  },
+  {
+    key: 'developer',
+    title: 'Developer credit',
+    description: 'Developer by Chethan Sringeswara.',
+  },
+] as const;
+
+type AboutModalKey = 'privacy' | 'terms';
 
 const DASHBOARD_SECTION_DETAILS: Record<DashboardSectionKey, { title: string; description: string }> = {
   insights: {
@@ -95,6 +149,8 @@ export default function MoreScreen() {
   const [generalOpen, setGeneralOpen] = useState(true);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [activeAboutModal, setActiveAboutModal] = useState<AboutModalKey | null>(null);
   const [dataStatus, setDataStatus] = useState<string | null>(null);
   const [transferNotification, setTransferNotification] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -139,6 +195,24 @@ export default function MoreScreen() {
   const showTransferNotification = (message: string) => {
     setTransferNotification(message);
   };
+
+  const activeAboutContent = useMemo(() => {
+    if (activeAboutModal === 'privacy') {
+      return {
+        title: 'Privacy policy',
+        body: PRIVACY_POLICY_TEXT,
+      };
+    }
+
+    if (activeAboutModal === 'terms') {
+      return {
+        title: 'Terms of service',
+        body: TERMS_OF_SERVICE_TEXT,
+      };
+    }
+
+    return null;
+  }, [activeAboutModal]);
 
   const handleExportData = async () => {
     if (isExporting) {
@@ -548,7 +622,86 @@ export default function MoreScreen() {
             </>
           ) : null}
         </View>
+
+        <View style={styles.sectionCard}>
+          <Pressable onPress={() => setAboutOpen((current) => !current)} style={styles.sectionHeaderButton}>
+            <View style={styles.sectionHeaderTextWrap}>
+              <Text style={styles.sectionTitle}>About</Text>
+              <Text style={styles.sectionSubtitle}>Track walking sessions, goals, and history in one simple daily log.</Text>
+            </View>
+            <Ionicons color={colors.textPrimary} name={aboutOpen ? 'chevron-up' : 'chevron-down'} size={20} />
+          </Pressable>
+
+          {aboutOpen ? (
+            <>
+              {ABOUT_ITEMS.map((item) => {
+                const isModalItem = item.key === 'privacy' || item.key === 'terms';
+
+                if (isModalItem) {
+                  return (
+                    <Pressable
+                      key={item.key}
+                      accessibilityLabel={`Open ${item.title}`}
+                      accessibilityRole="button"
+                      onPress={() => setActiveAboutModal(item.key)}
+                      style={styles.row}
+                    >
+                      <View style={styles.rowTop}>
+                        <View style={styles.rowTextWrap}>
+                          <Text style={styles.rowTitle}>{item.title}</Text>
+                          <Text style={styles.rowDescription}>{item.description}</Text>
+                        </View>
+                        <View style={styles.aboutChevronWrap}>
+                          <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                }
+
+                return (
+                  <View key={item.key} style={styles.row}>
+                    <View style={styles.rowTextWrap}>
+                      <Text style={styles.rowTitle}>{item.title}</Text>
+                      <Text style={styles.rowDescription}>{item.description}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          ) : null}
+        </View>
       </ScrollView>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setActiveAboutModal(null)}
+        transparent
+        visible={Boolean(activeAboutContent)}
+      >
+        <View style={styles.aboutModalOverlay}>
+          <View style={styles.aboutModalSheet}>
+            <Text style={styles.aboutModalTitle}>{activeAboutContent?.title}</Text>
+
+            <ScrollView
+              contentContainerStyle={styles.aboutModalContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.aboutModalScroll}
+            >
+              <Text style={styles.aboutModalBody}>{activeAboutContent?.body}</Text>
+            </ScrollView>
+
+            <Pressable
+              accessibilityLabel="Close about modal"
+              accessibilityRole="button"
+              onPress={() => setActiveAboutModal(null)}
+              style={styles.aboutModalCloseButton}
+            >
+              <Text style={styles.aboutModalCloseButtonText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
