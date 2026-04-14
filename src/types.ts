@@ -40,7 +40,7 @@ export type UserSettings = {
 
 export type RootTabParamList = {
   Home: undefined;
-  Add: { openComposerToken?: number } | undefined;
+  Add: { openComposerToken?: number; targetDateKey?: string } | undefined;
   Compose: undefined;
   History: undefined;
   More: undefined;

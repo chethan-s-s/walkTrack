@@ -178,6 +178,73 @@ export const createStyles = (colors: AppColors) =>
       fontSize: 13,
       lineHeight: 18,
     },
+    patternCard: {
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 22,
+      padding: 14,
+      gap: 12,
+    },
+    patternHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    patternTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '800',
+    },
+    patternSubtitle: {
+      color: colors.textMuted,
+      fontSize: 13,
+    },
+    patternBarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    patternBarLabel: {
+      width: 74,
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    patternBarTrack: {
+      flex: 1,
+      height: 10,
+      borderRadius: 999,
+      backgroundColor: colors.actionSurface,
+      overflow: 'hidden',
+    },
+    patternBarFill: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: colors.accent,
+    },
+    patternBarMeta: {
+      minWidth: 54,
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '700',
+      textAlign: 'right',
+    },
+    consistencyRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    consistencyTile: {
+      flex: 1,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 20,
+      padding: 14,
+      gap: 6,
+    },
+    consistencyValue: {
+      color: colors.textPrimary,
+      fontSize: 22,
+      fontWeight: '800',
+    },
     chartCard: {
       backgroundColor: colors.surface,
       borderRadius: 28,
@@ -402,32 +469,8 @@ export const createStyles = (colors: AppColors) =>
     heatmapCellToday: {
       borderColor: colors.textPrimary,
     },
-    heatmapCellSelected: {
-      borderColor: colors.accent,
-      borderWidth: 3,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.16,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 4,
-    },
-    heatmapTooltip: {
-      position: 'absolute',
-      bottom: '100%',
-      marginBottom: 10,
-      minWidth: 54,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      backgroundColor: colors.textPrimary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 5,
-    },
-    heatmapTooltipText: {
-      color: colors.background,
-      fontSize: 11,
-      fontWeight: '800',
+    heatmapCellFuture: {
+      opacity: 0.38,
     },
     heatmapCellEmpty: {
       backgroundColor: 'transparent',

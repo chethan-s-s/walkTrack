@@ -3,7 +3,15 @@ import test from 'node:test';
 
 import { UserSettings } from '../types';
 import { getDailyGoalMinutesForDate } from './dailyGoals';
-import { getCurrentStreak, getWeeklyGoalHitCount } from './analytics';
+import {
+  getAverageDailyMinutes,
+  getBestWeekday,
+  getCurrentStreak,
+  getGoalCompletionRate,
+  getLongestStreak,
+  getTimeOfDayPattern,
+  getWeeklyGoalHitCount,
+} from './analytics';
 
 const settings: UserSettings = {
   weekStart: 'monday',
@@ -49,4 +57,36 @@ test('goal-based weekly hits and streak use the goal active on each date', () =>
 
   assert.equal(getWeeklyGoalHitCount(entries, settings, new Date('2026-04-14T12:00:00.000Z'), 'monday'), 1);
   assert.equal(getCurrentStreak(entries, settings, new Date('2026-04-14T12:00:00.000Z')), 0);
+});
+
+test('expanded analytics return weekday, streak, average, consistency, and time-of-day patterns', () => {
+  const entries = [
+    {
+      id: '2026-04-07',
+      date: '2026-04-07',
+      totalMinutes: 60,
+      createdAt: '2026-04-07T07:00:00.000Z',
+      sessions: [{ id: '1', date: '2026-04-07', minutes: 60, createdAt: '2026-04-07T07:00:00.000Z' }],
+    },
+    {
+      id: '2026-04-08',
+      date: '2026-04-08',
+      totalMinutes: 80,
+      createdAt: '2026-04-08T18:00:00.000Z',
+      sessions: [{ id: '2', date: '2026-04-08', minutes: 80, createdAt: '2026-04-08T18:00:00.000Z' }],
+    },
+    {
+      id: '2026-04-09',
+      date: '2026-04-09',
+      totalMinutes: 90,
+      createdAt: '2026-04-09T08:30:00.000Z',
+      sessions: [{ id: '3', date: '2026-04-09', minutes: 90, createdAt: '2026-04-09T08:30:00.000Z' }],
+    },
+  ];
+
+  assert.equal(getLongestStreak(entries, settings, new Date('2026-04-09T12:00:00.000Z')), 3);
+  assert.equal(getAverageDailyMinutes(entries, 3, new Date('2026-04-09T12:00:00.000Z')), 77);
+  assert.equal(getBestWeekday(entries)?.label, 'Thursday');
+  assert.equal(getGoalCompletionRate(entries, settings, 'week', new Date('2026-04-09T12:00:00.000Z')).completedDays, 3);
+  assert.equal(getTimeOfDayPattern(entries).topLabel, 'Morning');
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -11,18 +11,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 
 import GoalProgressRing from '../../components/GoalProgressRing';
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { getDateKey } from '../../storage/walkingStorage';
 import { useAppColors } from '../../theme/useAppColors';
 import {
+  getAverageDailyMinutes,
   getAverageSessionLength,
   getBestDay,
+  getBestWeekday,
   getCurrentStreak,
+  getGoalCompletionRate,
   getWeekStartDate,
+  getLongestStreak,
   getMilestoneBadge,
   getMonthlyHeatmapCalendar,
+  getTimeOfDayPattern,
   getTotalMinutesThisMonth,
   getWeekDates,
   getWeeklyGoalHitCount,
@@ -31,7 +38,7 @@ import {
 import { formatDuration } from '../../utils/formatDuration';
 import { createStyles } from './HomeScreenStyles';
 import { useAppSettings } from '../../context/AppSettingsContext';
-import { DashboardSectionKey } from '../../types';
+import { DashboardSectionKey, RootTabParamList } from '../../types';
 import { formatDashboardDate, formatEntryDate } from '../../utils/time';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -72,6 +79,7 @@ const getHeatLabelColor = (minutes: number, maxMinutes: number, colors: ReturnTy
 };
 
 export default function HomeScreen() {
+  const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { entries, loading, todayMinutes } = useWalkingData();
@@ -84,7 +92,6 @@ export default function HomeScreen() {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
-  const [heatmapTooltip, setHeatmapTooltip] = useState<{ key: string; id: number } | null>(null);
   const currentMonthStart = useMemo(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -114,9 +121,15 @@ export default function HomeScreen() {
   );
   const bestDay = useMemo(() => getBestDay(entries), [entries]);
   const averageSessionLength = useMemo(() => getAverageSessionLength(entries), [entries]);
+  const weeklyAverage = useMemo(() => getAverageDailyMinutes(entries, 7), [entries]);
   const totalMinutesThisMonth = useMemo(() => getTotalMinutesThisMonth(entries), [entries]);
   const weeklyTrend = useMemo(() => getWeeklyTrend(entries, settings.weekStart), [entries, settings.weekStart]);
   const currentStreak = useMemo(() => getCurrentStreak(entries, settings), [entries, settings]);
+  const longestStreak = useMemo(() => getLongestStreak(entries, settings), [entries, settings]);
+  const bestWeekday = useMemo(() => getBestWeekday(entries), [entries]);
+  const weeklyConsistency = useMemo(() => getGoalCompletionRate(entries, settings, 'week'), [entries, settings]);
+  const monthlyConsistency = useMemo(() => getGoalCompletionRate(entries, settings, 'month'), [entries, settings]);
+  const timeOfDayPattern = useMemo(() => getTimeOfDayPattern(entries), [entries]);
   const milestoneBadge = useMemo(() => getMilestoneBadge(entries), [entries]);
   const heatmapCalendar = useMemo(
     () => getMonthlyHeatmapCalendar(entries, selectedHeatmapMonth, settings.weekStart),
@@ -149,17 +162,10 @@ export default function HomeScreen() {
   }, [selectedRhythmWeekStart, weeklyBars]);
   const remainingGoalMinutes = Math.max(currentDailyGoalMinutes - todayMinutes, 0);
   const isGoalReached = todayMinutes >= currentDailyGoalMinutes;
-  useEffect(() => {
-    if (!heatmapTooltip) {
-      return undefined;
-    }
-
-    const timeout = setTimeout(() => {
-      setHeatmapTooltip(null);
-    }, 2000);
-
-    return () => clearTimeout(timeout);
-  }, [heatmapTooltip]);
+  const currentWeekMinutes = useMemo(() => {
+    const weekKeys = new Set(getWeekDates(new Date(), settings.weekStart).map((date) => getDateKey(date)));
+    return entries.reduce((total, entry) => total + (weekKeys.has(entry.date) ? entry.totalMinutes : 0), 0);
+  }, [entries, settings.weekStart]);
 
   const changeHeatmapMonth = (direction: -1 | 1) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -172,7 +178,6 @@ export default function HomeScreen() {
 
       return nextMonth;
     });
-    setHeatmapTooltip(null);
   };
 
   const changeRhythmWeek = (direction: -1 | 1) => {
@@ -196,7 +201,7 @@ export default function HomeScreen() {
       insights: (
         <View style={styles.insightsCard}>
           <Text style={styles.sectionTitle}>Insights</Text>
-          <Text style={styles.sectionSubtitle}>Quick highlights.</Text>
+          <Text style={styles.sectionSubtitle}>Trends, consistency, and goal progress.</Text>
 
           <View style={styles.insightGrid}>
             <View style={styles.insightTile}>
@@ -215,12 +220,91 @@ export default function HomeScreen() {
               <Text style={styles.insightMeta}>Across all sessions</Text>
             </View>
 
+            <View style={styles.insightTile}>
+              <Text style={styles.insightLabel}>Weekly average</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {formatDuration(weeklyAverage)}
+              </Text>
+              <Text style={styles.insightMeta}>Average daily minutes over the last 7 days</Text>
+            </View>
+
+            <View style={styles.insightTile}>
+              <Text style={styles.insightLabel}>Longest streak</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {longestStreak ? `${longestStreak} days` : '—'}
+              </Text>
+              <Text style={styles.insightMeta}>Best run of goal-hitting days</Text>
+            </View>
+
+            <View style={styles.insightTile}>
+              <Text style={styles.insightLabel}>Best weekday</Text>
+              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
+                {bestWeekday?.label ?? '—'}
+              </Text>
+              <Text style={styles.insightMeta}>{bestWeekday ? formatDuration(bestWeekday.totalMinutes) : 'No pattern yet'}</Text>
+            </View>
+
             <View style={styles.insightTileWide}>
               <Text style={styles.insightLabel}>This month</Text>
               <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
                 {formatDuration(totalMinutesThisMonth)}
               </Text>
               <Text style={styles.insightMeta}>Total logged this month</Text>
+            </View>
+          </View>
+
+          <View style={styles.patternCard}>
+            <View style={styles.patternHeader}>
+              <View style={styles.sectionTextWrap}>
+                <Text style={styles.patternTitle}>Time-of-day patterns</Text>
+                <Text style={styles.patternSubtitle}>Strongest window: {timeOfDayPattern.topLabel}</Text>
+              </View>
+              <View style={styles.chartWeekBadge}>
+                <Text style={styles.chartWeekBadgeText}>{formatDuration(timeOfDayPattern.topMinutes)}</Text>
+              </View>
+            </View>
+
+            {timeOfDayPattern.buckets.map((bucket) => {
+              const maxBucketMinutes = Math.max(...timeOfDayPattern.buckets.map((item) => item.minutes), 1);
+              const width = bucket.minutes ? Math.max((bucket.minutes / maxBucketMinutes) * 100, 12) : 0;
+
+              return (
+                <View key={bucket.key} style={styles.patternBarRow}>
+                  <Text style={styles.patternBarLabel}>{bucket.label}</Text>
+                  <View style={styles.patternBarTrack}>
+                    <View style={[styles.patternBarFill, { width: `${width}%` }]} />
+                  </View>
+                  <Text style={styles.patternBarMeta}>{formatDuration(bucket.minutes)}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.consistencyRow}>
+            <View style={styles.consistencyTile}>
+              <Text style={styles.insightLabel}>Weekly goal progress</Text>
+              <Text style={styles.consistencyValue}>{formatDuration(currentWeekMinutes)}</Text>
+              <Text style={styles.insightMeta}>of {formatDuration(settings.weeklyGoalMinutes)} weekly minutes</Text>
+            </View>
+
+            <View style={styles.consistencyTile}>
+              <Text style={styles.insightLabel}>Monthly goal progress</Text>
+              <Text style={styles.consistencyValue}>{formatDuration(totalMinutesThisMonth)}</Text>
+              <Text style={styles.insightMeta}>of {formatDuration(settings.monthlyGoalMinutes)} monthly minutes</Text>
+            </View>
+          </View>
+
+          <View style={styles.consistencyRow}>
+            <View style={styles.consistencyTile}>
+              <Text style={styles.insightLabel}>Weekly consistency</Text>
+              <Text style={styles.consistencyValue}>{weeklyConsistency.percent}%</Text>
+              <Text style={styles.insightMeta}>{weeklyConsistency.completedDays}/{weeklyConsistency.totalDays} goal days</Text>
+            </View>
+
+            <View style={styles.consistencyTile}>
+              <Text style={styles.insightLabel}>Monthly consistency</Text>
+              <Text style={styles.consistencyValue}>{monthlyConsistency.percent}%</Text>
+              <Text style={styles.insightMeta}>{monthlyConsistency.completedDays}/{monthlyConsistency.totalDays} goal days</Text>
             </View>
           </View>
         </View>
@@ -358,25 +442,21 @@ export default function HomeScreen() {
             {heatmapCalendar.cells.map((day) =>
               day.isCurrentMonth ? (
                 <Pressable
-                  accessibilityHint="Double tap to show the logged time for this day"
+                  accessibilityHint={day.key > todayKey ? 'Future days are unavailable' : 'Open this day in the walking timeline'}
                   accessibilityLabel={`${day.dayNumber} ${heatmapCalendar.monthLabel}, ${formatDuration(day.minutes)} walked${day.isToday ? ', today' : ''}`}
-                  accessibilityState={{ selected: heatmapTooltip?.key === day.key }}
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: day.key > todayKey }}
+                  disabled={day.key > todayKey}
                   hitSlop={6}
                   key={day.key}
-                  onPress={() => setHeatmapTooltip({ key: day.key, id: Date.now() })}
+                  onPress={() => navigation.navigate('Add', { targetDateKey: day.key })}
                   style={[
                     styles.heatmapCell,
                     { backgroundColor: getHeatColor(day.minutes, heatmapMaxMinutes, colors) },
                     day.isToday && styles.heatmapCellToday,
-                    heatmapTooltip?.key === day.key && styles.heatmapCellSelected,
+                    day.key > todayKey && styles.heatmapCellFuture,
                   ]}
                 >
-                  {heatmapTooltip?.key === day.key ? (
-                    <View style={styles.heatmapTooltip}>
-                      <Text style={styles.heatmapTooltipText}>{formatDuration(day.minutes)}</Text>
-                    </View>
-                  ) : null}
                   <View style={styles.heatmapCellContent}>
                     <Text
                       style={[
@@ -414,23 +494,32 @@ export default function HomeScreen() {
   }, [
     averageSessionLength,
     bestDay,
+    bestWeekday,
     canGoToNextRhythmWeek,
+    currentWeekMinutes,
     changeRhythmWeek,
     colors,
     currentStreak,
     currentDailyGoalMinutes,
     heatmapCalendar,
     heatmapMaxMinutes,
+    longestStreak,
     milestoneBadge,
     maxMinutes,
+    monthlyConsistency,
+    navigation,
     settings.dashboardOrder,
     settings.hiddenDashboardSections,
+    settings.monthlyGoalMinutes,
+    settings.weeklyGoalMinutes,
     canGoToNextHeatmapMonth,
-    heatmapTooltip,
     rhythmWeekLabel,
     selectedWeekMinutes,
+    timeOfDayPattern,
     totalMinutesThisMonth,
+    weeklyAverage,
     weeklyBars,
+    weeklyConsistency,
     weeklyGoalHits,
     weeklyTrend,
     styles,

@@ -108,6 +108,9 @@ export const createStyles = (colors: AppColors) =>
       alignItems: 'center',
       gap: 12,
     },
+    rowMainButton: {
+      flex: 1,
+    },
     rowTextWrap: {
       flex: 1,
       minWidth: 0,
@@ -127,6 +130,16 @@ export const createStyles = (colors: AppColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
+    },
+    expandButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     minutesPill: {
       borderRadius: 999,

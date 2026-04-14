@@ -34,6 +34,7 @@ import {
   getDefaultTargetHour,
   getHourRange,
   getHoursForMinutes,
+  parseDateKey,
   getSuggestedStartMinute,
   normalizeHour,
   normalizeMinute,
@@ -86,7 +87,7 @@ const getPositiveMinutes = (value: string) => {
   return numericValue;
 };
 
-export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamList, 'Add'>) {
+export default function AddScreen({ navigation, route }: BottomTabScreenProps<RootTabParamList, 'Add'>) {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { getDailyGoalMinutesForDate, settings } = useAppSettings();
@@ -297,7 +298,7 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
     const count = selectedSessionGroupIds.length;
     const label = formatReadableDate(selectedDate);
 
-    return `  ${count} walk${count === 1 ? '' : 's'}\n selected`;
+    return `${count} session${count === 1 ? '' : 's'} selected on ${label}`;
   }, [selectedDate, selectedSessionGroupIds.length]);
   const areAllDaySessionsSelected =
     allSelectableGroupIds.length > 0 && selectedSessionGroupIds.length === allSelectableGroupIds.length;
@@ -463,6 +464,25 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
     lastOpenComposerTokenRef.current = openComposerToken;
     openModal();
   }, [openModal, route.params?.openComposerToken]);
+
+  useEffect(() => {
+    const targetDateKey = route.params?.targetDateKey;
+
+    if (!targetDateKey) {
+      return;
+    }
+
+    const nextTargetDateKey = targetDateKey > currentDateKey ? currentDateKey : targetDateKey;
+
+    if (nextTargetDateKey === selectedKey) {
+      navigation.setParams({ targetDateKey: undefined });
+      return;
+    }
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedDate(parseDateKey(nextTargetDateKey));
+    navigation.setParams({ targetDateKey: undefined });
+  }, [currentDateKey, navigation, route.params?.targetDateKey, selectedKey]);
 
   const openEditModal = (session: WalkingSession) => {
     if (!canEditSelectedDate) {
@@ -923,20 +943,20 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
             </Text>
             <View style={styles.selectionBarActions}>
               <Pressable
-                accessibilityLabel={areAllDaySessionsSelected ? 'All walks on this day are selected' : 'Select all walks on this day'}
+                accessibilityLabel={areAllDaySessionsSelected ? 'All sessions on this day are selected' : 'Select all sessions on this day'}
                 accessibilityRole="button"
                 disabled={areAllDaySessionsSelected}
                 onPress={selectAllSessionsForDay}
                 style={styles.selectionSecondaryButton}
               >
-                <Text style={styles.selectionSecondaryButtonText}>Select all </Text>
+                <Text style={styles.selectionSecondaryButtonText}>Select all on this day</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={clearSessionSelection} style={styles.selectionSecondaryButton}>
                 <Text style={styles.selectionSecondaryButtonText}>Cancel</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={handleDeleteSelectedSessions} style={styles.selectionPrimaryButton}>
                 <Ionicons color={colors.textPrimary} name="trash-outline" size={18} />
-                {/* <Text style={styles.selectionPrimaryButtonText}>Delete selected</Text> */}
+                <Text style={styles.selectionPrimaryButtonText}>Delete selected</Text>
               </Pressable>
             </View>
           </View>

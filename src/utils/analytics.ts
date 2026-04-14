@@ -2,6 +2,20 @@ import { UserSettings, WalkingEntry, WeekStartDay } from '../types';
 import { getDateKey } from '../storage/walkingStorage';
 import { getDailyGoalMinutesForDate } from './dailyGoals';
 
+type TimeOfDayKey = 'morning' | 'afternoon' | 'evening';
+
+const getTimeOfDayKey = (hour: number): TimeOfDayKey => {
+  if (hour < 12) {
+    return 'morning';
+  }
+
+  if (hour < 18) {
+    return 'afternoon';
+  }
+
+  return 'evening';
+};
+
 export const getWeekStartDate = (date = new Date(), weekStart: WeekStartDay = 'monday') => {
   const nextDate = new Date(date);
   nextDate.setHours(0, 0, 0, 0);
@@ -229,4 +243,137 @@ export const getMilestoneBadge = (entries: WalkingEntry[]) => {
   ];
 
   return milestones.find((milestone) => lifetimeMinutes >= milestone.minutes) ?? null;
+};
+
+export const getLongestStreak = (entries: WalkingEntry[], settings: UserSettings, date = new Date()) => {
+  const entryMap = new Map(entries.map((entry) => [entry.date, entry.totalMinutes]));
+  const sortedDates = [...entryMap.keys()].sort();
+
+  if (!sortedDates.length) {
+    return 0;
+  }
+
+  const startDate = new Date(sortedDates[0]);
+  const endDate = new Date(date);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+
+  let longest = 0;
+  let active = 0;
+
+  for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
+    const key = getDateKey(cursor);
+
+    if ((entryMap.get(key) ?? 0) >= getDailyGoalMinutesForDate(settings, key)) {
+      active += 1;
+      longest = Math.max(longest, active);
+    } else {
+      active = 0;
+    }
+  }
+
+  return longest;
+};
+
+export const getBestWeekday = (entries: WalkingEntry[]) => {
+  const totals = new Map<number, number>();
+
+  entries.forEach((entry) => {
+    const [year, month, day] = entry.date.split('-').map(Number);
+    const weekday = new Date(year, month - 1, day).getDay();
+    totals.set(weekday, (totals.get(weekday) ?? 0) + entry.totalMinutes);
+  });
+
+  const best = [...totals.entries()].sort((left, right) => right[1] - left[1])[0];
+
+  if (!best) {
+    return null;
+  }
+
+  const label = new Date(2026, 0, 4 + best[0]).toLocaleDateString('en-US', { weekday: 'long' });
+
+  return {
+    label,
+    totalMinutes: best[1],
+  };
+};
+
+export const getAverageDailyMinutes = (entries: WalkingEntry[], days = 7, date = new Date()) => {
+  const endDate = new Date(date);
+  endDate.setHours(0, 0, 0, 0);
+  const entryMap = new Map(entries.map((entry) => [entry.date, entry.totalMinutes]));
+
+  let total = 0;
+
+  for (let index = 0; index < days; index += 1) {
+    const cursor = new Date(endDate);
+    cursor.setDate(endDate.getDate() - index);
+    total += entryMap.get(getDateKey(cursor)) ?? 0;
+  }
+
+  return Math.round(total / days);
+};
+
+export const getGoalCompletionRate = (
+  entries: WalkingEntry[],
+  settings: UserSettings,
+  scope: 'week' | 'month',
+  date = new Date(),
+) => {
+  const startDate = scope === 'week' ? getWeekStartDate(date, settings.weekStart) : new Date(date.getFullYear(), date.getMonth(), 1);
+  const endDate = scope === 'week' ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6) : new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const entryMap = new Map(entries.map((entry) => [entry.date, entry.totalMinutes]));
+
+  let completedDays = 0;
+  let totalDays = 0;
+
+  for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
+    const key = getDateKey(cursor);
+    totalDays += 1;
+
+    if ((entryMap.get(key) ?? 0) >= getDailyGoalMinutesForDate(settings, key)) {
+      completedDays += 1;
+    }
+  }
+
+  return {
+    completedDays,
+    totalDays,
+    percent: totalDays ? Math.round((completedDays / totalDays) * 100) : 0,
+  };
+};
+
+export const getTimeOfDayPattern = (entries: WalkingEntry[]) => {
+  const totals: Record<TimeOfDayKey, number> = {
+    morning: 0,
+    afternoon: 0,
+    evening: 0,
+  };
+
+  entries.forEach((entry) => {
+    entry.sessions.forEach((session) => {
+      const hour = new Date(session.createdAt).getHours();
+      totals[getTimeOfDayKey(hour)] += session.minutes;
+    });
+  });
+
+  const labels: Record<TimeOfDayKey, string> = {
+    morning: 'Morning',
+    afternoon: 'Afternoon',
+    evening: 'Evening',
+  };
+
+  const buckets = (Object.keys(totals) as TimeOfDayKey[]).map((key) => ({
+    key,
+    label: labels[key],
+    minutes: totals[key],
+  }));
+
+  const topBucket = [...buckets].sort((left, right) => right.minutes - left.minutes)[0] ?? buckets[0];
+
+  return {
+    topLabel: topBucket?.label ?? 'Morning',
+    topMinutes: topBucket?.minutes ?? 0,
+    buckets,
+  };
 };
