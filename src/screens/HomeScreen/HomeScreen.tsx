@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   Text,
+  UIManager,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +33,10 @@ import { createStyles } from './HomeScreenStyles';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { DashboardSectionKey } from '../../types';
 import { formatDashboardDate, formatEntryDate } from '../../utils/time';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const formatDay = (date: Date) =>
   date.toLocaleDateString('en-US', {
@@ -155,6 +162,7 @@ export default function HomeScreen() {
   }, [heatmapTooltip]);
 
   const changeHeatmapMonth = (direction: -1 | 1) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedHeatmapMonth((currentMonth) => {
       const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1);
 
@@ -168,6 +176,7 @@ export default function HomeScreen() {
   };
 
   const changeRhythmWeek = (direction: -1 | 1) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedRhythmWeekDate((currentDate) => {
       const nextDate = new Date(currentDate);
       nextDate.setDate(nextDate.getDate() + direction * 7);
@@ -217,7 +226,11 @@ export default function HomeScreen() {
         </View>
       ),
       weeklyRhythm: (
-        <View style={styles.chartCard}>
+        <View
+          accessible
+          accessibilityLabel={`Weekly rhythm chart for ${rhythmWeekLabel}. Total ${formatDuration(selectedWeekMinutes)}. Highest day ${formatDuration(maxMinutes)}.`}
+          style={styles.chartCard}
+        >
           <View style={styles.chartHeaderRow}>
             <View style={styles.sectionTextWrap}>
               <Text style={styles.sectionTitle}>Weekly Rhythm</Text>
@@ -254,7 +267,7 @@ export default function HomeScreen() {
               const height = Math.max((bar.minutes / maxMinutes) * 120, bar.minutes > 0 ? 12 : 6);
 
               return (
-                <View key={bar.key} style={styles.barColumn}>
+                <View accessibilityLabel={`${bar.label}, ${formatDuration(bar.minutes)} walked`} accessible key={bar.key} style={styles.barColumn}>
                   <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.barMinutes}>
                     {formatDuration(bar.minutes)}
                   </Text>
@@ -301,7 +314,11 @@ export default function HomeScreen() {
         </View>
       ),
       heatmap: (
-        <View style={styles.heatmapCard}>
+        <View
+          accessible
+          accessibilityLabel={`Monthly heatmap for ${heatmapCalendar.monthLabel}. ${heatmapCalendar.cells.filter((day) => day.isCurrentMonth && day.minutes > 0).length} active days shown.`}
+          style={styles.heatmapCard}
+        >
           <View style={styles.heatmapHeaderRow}>
             <View style={styles.sectionTextWrap}>
               <Text style={styles.sectionTitle}>Heatmap</Text>
@@ -341,8 +358,11 @@ export default function HomeScreen() {
             {heatmapCalendar.cells.map((day) =>
               day.isCurrentMonth ? (
                 <Pressable
-                  accessibilityLabel={`${day.dayNumber} ${heatmapCalendar.monthLabel}, ${formatDuration(day.minutes)} walked`}
+                  accessibilityHint="Double tap to show the logged time for this day"
+                  accessibilityLabel={`${day.dayNumber} ${heatmapCalendar.monthLabel}, ${formatDuration(day.minutes)} walked${day.isToday ? ', today' : ''}`}
+                  accessibilityState={{ selected: heatmapTooltip?.key === day.key }}
                   accessibilityRole="button"
+                  hitSlop={6}
                   key={day.key}
                   onPress={() => setHeatmapTooltip({ key: day.key, id: Date.now() })}
                   style={[

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Animated,
+  Easing,
   Modal,
   Pressable,
   Text,
@@ -59,11 +61,55 @@ export default function SessionModal({
   onShiftTargetHour,
   onShiftTargetMinute,
 }: SessionModalProps) {
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const sheetTranslateY = useRef(new Animated.Value(24)).current;
+  const sheetScale = useRef(new Animated.Value(0.98)).current;
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    overlayOpacity.setValue(0);
+    sheetTranslateY.setValue(24);
+    sheetScale.setValue(0.98);
+
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(sheetTranslateY, {
+        toValue: 0,
+        damping: 18,
+        mass: 0.9,
+        stiffness: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(sheetScale, {
+        toValue: 1,
+        damping: 18,
+        mass: 0.9,
+        stiffness: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [overlayOpacity, sheetScale, sheetTranslateY, visible]);
+
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <View style={styles.modalOverlay}>
+    <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
+      <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
         <Pressable accessibilityLabel="Close session modal" accessibilityRole="button" onPress={onClose} style={styles.modalDismissArea} />
-        <View style={styles.modalSheet}>
+        <Animated.View
+          style={[
+            styles.modalSheet,
+            {
+              transform: [{ translateY: sheetTranslateY }, { scale: sheetScale }],
+            },
+          ]}
+        >
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>{editingSession ? 'Edit walking session' : 'Add walking minutes'}</Text>
           {/* <Text style={styles.modalSubtitle}>
@@ -204,8 +250,8 @@ export default function SessionModal({
               </LinearGradient>
             </Pressable>
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }

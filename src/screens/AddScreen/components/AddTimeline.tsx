@@ -128,8 +128,10 @@ export default function AddTimeline({
               {canEditSelectedDate && !selectionMode && suggestedMinute !== null ? (
                 <View {...getCreateDragHandlers(hour)}>
                   <Pressable
+                    accessibilityHint="Creates a new walk starting in this hour"
                     accessibilityLabel={`Add session around ${formatHourLabel(hour)}`}
                     accessibilityRole="button"
+                    hitSlop={8}
                     onPress={() => onOpenModal(hour, '30', suggestedMinute)}
                     style={[
                       styles.hourActionButton,
@@ -161,8 +163,15 @@ export default function AddTimeline({
                       </View>
                     ) : null}
                     <Pressable
-                      accessibilityHint={canEditSelectedDate ? 'Use the edit button to modify this session.' : undefined}
+                      accessibilityHint={
+                        selectionMode
+                          ? 'Double tap to toggle this session in the current selection.'
+                          : canEditSelectedDate
+                            ? 'Long press to select for bulk actions. Use the edit button to change it.'
+                            : undefined
+                      }
                       accessibilityLabel={`${session.displayMinutes} minute walk, ${formatSessionTimeRange(session.segment.createdAt, session.segment.minutes)}`}
+                      accessibilityState={{ selected: isSelected }}
                       delayLongPress={220}
                       onLongPress={() => onSessionLongPress(session.logicalSession)}
                       onPress={() => {
@@ -170,7 +179,7 @@ export default function AddTimeline({
                           onToggleSessionSelection(session.logicalSession);
                         }
                       }}
-                      accessibilityRole="summary"
+                      accessibilityRole="button"
                       style={[
                         styles.sessionCard,
                         selectionMode && styles.sessionCardSelectable,

@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  LayoutAnimation,
   LayoutChangeEvent,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   Text,
+  UIManager,
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -43,6 +46,10 @@ import { createStyles } from './AddScreenStyles';
 const QUICK_MINUTES = [15, 30, 45, 60];
 const DRAG_ACTIVATION_DISTANCE = 8;
 const MAX_SESSION_MINUTES = 24 * 60;
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type TimelineRowMeasurement = {
   pageY: number;
@@ -129,6 +136,10 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
   const selectedDayLogicalSessions = useMemo(
     () => mergeLinkedSessions(selectedEntry?.sessions ?? []),
     [selectedEntry?.sessions],
+  );
+  const allSelectableGroupIds = useMemo(
+    () => selectedDayLogicalSessions.map((session) => getSessionGroupId(session)),
+    [selectedDayLogicalSessions],
   );
   const totalMinutes = selectedEntry?.totalMinutes ?? 0;
   const averageSessionLength = useMemo(() => {
@@ -242,7 +253,6 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
 
   useEffect(() => {
     if (!undoSessions?.length) {
-      return undefined;
     }
 
     const timeout = setTimeout(() => {
@@ -283,6 +293,14 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
     () => [...toastItems].reverse().find((toastItem) => toastItem.type === 'warning') ?? null,
     [toastItems],
   );
+  const selectionSummaryText = useMemo(() => {
+    const count = selectedSessionGroupIds.length;
+    const label = formatReadableDate(selectedDate);
+
+    return `  ${count} walk${count === 1 ? '' : 's'}\n selected`;
+  }, [selectedDate, selectedSessionGroupIds.length]);
+  const areAllDaySessionsSelected =
+    allSelectableGroupIds.length > 0 && selectedSessionGroupIds.length === allSelectableGroupIds.length;
 
   const pushToast = (message: string, type: 'success' | 'warning') => {
     const nextToastId = toastIdRef.current + 1;
@@ -410,6 +428,7 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
   };
 
   const changeDate = (direction: -1 | 1) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedDate((currentDate) => {
       if (direction === 1 && getDateKey(currentDate) === getDateKey()) {
         return currentDate;
@@ -647,6 +666,7 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
   const startSessionSelection = (session: WalkingSession) => {
     const groupId = getSessionGroupId(session);
 
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedSessionGroupIds((currentGroupIds) =>
       currentGroupIds.includes(groupId) ? currentGroupIds : [...currentGroupIds, groupId],
     );
@@ -656,6 +676,7 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
   const toggleSessionSelection = (session: WalkingSession) => {
     const groupId = getSessionGroupId(session);
 
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedSessionGroupIds((currentGroupIds) =>
       currentGroupIds.includes(groupId)
         ? currentGroupIds.filter((currentGroupId) => currentGroupId !== groupId)
@@ -665,7 +686,18 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
   };
 
   const clearSessionSelection = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedSessionGroupIds([]);
+  };
+
+  const selectAllSessionsForDay = () => {
+    if (!allSelectableGroupIds.length) {
+      return;
+    }
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedSessionGroupIds(allSelectableGroupIds);
+    triggerSelectionHaptic();
   };
 
   const confirmDeleteSession = (session: WalkingSession) => {
@@ -718,6 +750,7 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
       await deleteWalkingSession(session.date, session);
     }
 
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     clearSessionSelection();
     setUndoSessions(deletedSessions);
     pushToast(
@@ -886,15 +919,24 @@ export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamLi
         <View style={styles.selectionBarWrap}>
           <View style={styles.selectionBar}>
             <Text style={styles.selectionBarText}>
-              {selectedSessionGroupIds.length} selected
+              {selectionSummaryText}
             </Text>
             <View style={styles.selectionBarActions}>
+              <Pressable
+                accessibilityLabel={areAllDaySessionsSelected ? 'All walks on this day are selected' : 'Select all walks on this day'}
+                accessibilityRole="button"
+                disabled={areAllDaySessionsSelected}
+                onPress={selectAllSessionsForDay}
+                style={styles.selectionSecondaryButton}
+              >
+                <Text style={styles.selectionSecondaryButtonText}>Select all </Text>
+              </Pressable>
               <Pressable accessibilityRole="button" onPress={clearSessionSelection} style={styles.selectionSecondaryButton}>
                 <Text style={styles.selectionSecondaryButtonText}>Cancel</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={handleDeleteSelectedSessions} style={styles.selectionPrimaryButton}>
                 <Ionicons color={colors.textPrimary} name="trash-outline" size={18} />
-                <Text style={styles.selectionPrimaryButtonText}>Delete</Text>
+                {/* <Text style={styles.selectionPrimaryButtonText}>Delete selected</Text> */}
               </Pressable>
             </View>
           </View>
