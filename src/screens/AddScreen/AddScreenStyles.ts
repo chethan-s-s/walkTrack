@@ -476,10 +476,8 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   selectionBar: {
     minHeight: 58,
-    // borderRadius: 0,
     paddingHorizontal: 16,
     backgroundColor: colors.actionSurface,
-    // borderWidth: 1,
     borderColor: colors.actionBorder,
     flexDirection: 'row',
     alignItems: 'center',
@@ -494,7 +492,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   selectionBarText: {
     color: colors.textPrimary,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     flex: 1,
   },
   selectionBarActions: {

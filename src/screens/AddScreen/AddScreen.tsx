@@ -298,7 +298,7 @@ export default function AddScreen({ navigation, route }: BottomTabScreenProps<Ro
     const count = selectedSessionGroupIds.length;
     const label = formatReadableDate(selectedDate);
 
-    return `${count} session${count === 1 ? '' : 's'} selected on ${label}`;
+    return `  ${count} walk${count === 1 ? '' : 's'}\n selected`;
   }, [selectedDate, selectedSessionGroupIds.length]);
   const areAllDaySessionsSelected =
     allSelectableGroupIds.length > 0 && selectedSessionGroupIds.length === allSelectableGroupIds.length;
@@ -943,20 +943,19 @@ export default function AddScreen({ navigation, route }: BottomTabScreenProps<Ro
             </Text>
             <View style={styles.selectionBarActions}>
               <Pressable
-                accessibilityLabel={areAllDaySessionsSelected ? 'All sessions on this day are selected' : 'Select all sessions on this day'}
+                accessibilityLabel={areAllDaySessionsSelected ? 'All sessions are selected' : 'Select all sessions'}
                 accessibilityRole="button"
                 disabled={areAllDaySessionsSelected}
                 onPress={selectAllSessionsForDay}
                 style={styles.selectionSecondaryButton}
               >
-                <Text style={styles.selectionSecondaryButtonText}>Select all on this day</Text>
+                <Text style={styles.selectionSecondaryButtonText}>Select all</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={clearSessionSelection} style={styles.selectionSecondaryButton}>
                 <Text style={styles.selectionSecondaryButtonText}>Cancel</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={handleDeleteSelectedSessions} style={styles.selectionPrimaryButton}>
                 <Ionicons color={colors.textPrimary} name="trash-outline" size={18} />
-                <Text style={styles.selectionPrimaryButtonText}>Delete selected</Text>
               </Pressable>
             </View>
           </View>
