@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { DashboardSectionKey, UserSettings, WeekStartDay } from '../types';
+import { DailyGoalHistoryEntry, DashboardSectionKey, UserSettings, WeekStartDay } from '../types';
+import { GOAL_HISTORY_BASE_DATE } from '../utils/dailyGoals';
 import {
   DAILY_GOAL_MINUTES,
   MONTHLY_GOAL_MINUTES,
@@ -20,6 +21,7 @@ export const DEFAULT_DASHBOARD_ORDER: DashboardSectionKey[] = [
 export const defaultSettings: UserSettings = {
   weekStart: 'monday',
   dailyGoalMinutes: DAILY_GOAL_MINUTES,
+  dailyGoalHistory: [{ date: GOAL_HISTORY_BASE_DATE, minutes: DAILY_GOAL_MINUTES }],
   weeklyGoalDays: WEEKLY_GOAL_DAYS,
   weeklyGoalMinutes: WEEKLY_GOAL_MINUTES,
   monthlyGoalMinutes: MONTHLY_GOAL_MINUTES,
@@ -73,12 +75,47 @@ const normalizeHiddenDashboardSections = (value: unknown): DashboardSectionKey[]
   return [...new Set(safeValues)];
 };
 
+const normalizeDailyGoalHistory = (value: unknown, fallbackMinutes: number): DailyGoalHistoryEntry[] => {
+  const safeValues = Array.isArray(value)
+    ? value.filter((item): item is DailyGoalHistoryEntry =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof item.date === 'string' &&
+        typeof item.minutes === 'number' &&
+        item.minutes >= 5,
+      )
+    : [];
+
+  const entriesByDate = safeValues.reduce<Map<string, DailyGoalHistoryEntry>>((accumulator, item) => {
+    accumulator.set(item.date, {
+      date: item.date,
+      minutes: Math.round(item.minutes),
+    });
+    return accumulator;
+  }, new Map());
+
+  if (!entriesByDate.has(GOAL_HISTORY_BASE_DATE)) {
+    entriesByDate.set(GOAL_HISTORY_BASE_DATE, {
+      date: GOAL_HISTORY_BASE_DATE,
+      minutes: fallbackMinutes,
+    });
+  }
+
+  return [...entriesByDate.values()].sort((left, right) => left.date.localeCompare(right.date));
+};
+
 const normalizeSettings = (value: Partial<UserSettings> | null | undefined): UserSettings => ({
-  weekStart: normalizeWeekStart(value?.weekStart),
   dailyGoalMinutes:
     typeof value?.dailyGoalMinutes === 'number' && value.dailyGoalMinutes >= 5
       ? Math.round(value.dailyGoalMinutes)
       : defaultSettings.dailyGoalMinutes,
+  weekStart: normalizeWeekStart(value?.weekStart),
+  dailyGoalHistory: normalizeDailyGoalHistory(
+    value?.dailyGoalHistory,
+    typeof value?.dailyGoalMinutes === 'number' && value.dailyGoalMinutes >= 5
+      ? Math.round(value.dailyGoalMinutes)
+      : defaultSettings.dailyGoalMinutes,
+  ),
   weeklyGoalDays:
     typeof value?.weeklyGoalDays === 'number' && value.weeklyGoalDays >= 1 && value.weeklyGoalDays <= 7
       ? Math.round(value.weeklyGoalDays)

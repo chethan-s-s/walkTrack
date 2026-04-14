@@ -240,6 +240,28 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     marginLeft: -2,
     gap: 8,
   },
+  sessionSelectableWrap: {
+    position: 'relative',
+  },
+  sessionSelectionIndicator: {
+    position: 'absolute',
+    left: -20,
+    top: '50%',
+    width: 22,
+    height: 22,
+    marginTop: -11,
+    borderRadius: 11,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  sessionSelectionIndicatorActive: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
   sessionCard: {
     backgroundColor: colors.actionSurface,
     borderRadius: 16,
@@ -250,6 +272,13 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  sessionCardSelectable: {
+    paddingLeft: 16,
+  },
+  sessionCardSelected: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.textPrimary,
   },
   sessionCardDragging: {
     opacity: 0.45,
@@ -431,7 +460,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
   },
-  floatingBarWrap: {
+  selectionBarWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
@@ -440,8 +469,8 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     zIndex: 50,
     elevation: 12,
   },
-  floatingBar: {
-    minHeight: 54,
+  selectionBar: {
+    minHeight: 58,
     borderRadius: 22,
     paddingHorizontal: 16,
     backgroundColor: colors.actionSurface,
@@ -449,7 +478,7 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     borderColor: colors.actionBorder,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     gap: 10,
     shadowColor: colors.shadow,
     shadowOpacity: 0.24,
@@ -457,9 +486,46 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
   },
-  floatingBarText: {
+  selectionBarText: {
     color: colors.textPrimary,
     fontSize: 15,
+    fontWeight: '800',
+  },
+  selectionBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectionSecondaryButton: {
+    minHeight: 40,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  selectionSecondaryButtonText: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  selectionPrimaryButton: {
+    minHeight: 40,
+    borderRadius: 16,
+    backgroundColor: colors.destructive,
+    borderWidth: 1,
+    borderColor: colors.destructiveBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  selectionPrimaryButtonText: {
+    color: colors.textPrimary,
+    fontSize: 14,
     fontWeight: '800',
   },
   messageStackWrap: {

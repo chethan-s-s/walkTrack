@@ -31,6 +31,7 @@ const isUserSettings = (value: unknown): value is UserSettings =>
   isObject(value) &&
   (value.weekStart === 'sunday' || value.weekStart === 'monday') &&
   typeof value.dailyGoalMinutes === 'number' &&
+  (value.dailyGoalHistory === undefined || Array.isArray(value.dailyGoalHistory)) &&
   typeof value.weeklyGoalDays === 'number' &&
   typeof value.weeklyGoalMinutes === 'number' &&
   typeof value.monthlyGoalMinutes === 'number' &&

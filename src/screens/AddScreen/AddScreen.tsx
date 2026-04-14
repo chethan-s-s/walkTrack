@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,7 +20,7 @@ import { useAppSettings } from '../../context/AppSettingsContext';
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { getDateKey } from '../../storage/walkingStorage';
 import { useAppColors } from '../../theme/useAppColors';
-import { WalkingSession } from '../../types';
+import { RootTabParamList, WalkingSession } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
 import {
   buildSessionSegments,
@@ -78,10 +79,10 @@ const getPositiveMinutes = (value: string) => {
   return numericValue;
 };
 
-export default function AddScreen() {
+export default function AddScreen({ route }: BottomTabScreenProps<RootTabParamList, 'Add'>) {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { settings } = useAppSettings();
+  const { getDailyGoalMinutesForDate, settings } = useAppSettings();
   const {
     entries,
     deleteWalkingSession,
@@ -99,6 +100,7 @@ export default function AddScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [sessionPendingDelete, setSessionPendingDelete] = useState<WalkingSession | null>(null);
   const [editingSession, setEditingSession] = useState<WalkingSession | null>(null);
+  const [selectedSessionGroupIds, setSelectedSessionGroupIds] = useState<string[]>([]);
   const [undoSessions, setUndoSessions] = useState<WalkingSession[] | null>(null);
   const [targetHour, setTargetHour] = useState(() => defaultTargetHour);
   const [targetMinute, setTargetMinute] = useState(getDefaultTargetMinute());
@@ -110,6 +112,7 @@ export default function AddScreen() {
   const timelineRowRefs = useRef<Record<number, View | null>>({});
   const createDragRef = useRef<CreateDragState | null>(null);
   const moveDragRef = useRef<MoveDragState | null>(null);
+  const lastOpenComposerTokenRef = useRef<number | undefined>(undefined);
   const toastIdRef = useRef(0);
 
   const selectedKey = useMemo(() => getDateKey(selectedDate), [selectedDate]);
@@ -119,6 +122,9 @@ export default function AddScreen() {
   const canEditSelectedDate = selectedKey <= currentDateKey;
   const canGoForward = !isCurrentDate;
   const selectedEntry = getEntryForDate(selectedKey);
+  const selectedDailyGoalMinutes = getDailyGoalMinutesForDate(selectedKey);
+  const isSelectionMode = selectedSessionGroupIds.length > 0;
+  const selectedSessionGroupIdSet = useMemo(() => new Set(selectedSessionGroupIds), [selectedSessionGroupIds]);
   const allSessions = useMemo(() => entries.flatMap((entry) => entry.sessions), [entries]);
   const selectedDayLogicalSessions = useMemo(
     () => mergeLinkedSessions(selectedEntry?.sessions ?? []),
@@ -264,6 +270,7 @@ export default function AddScreen() {
     setCreateDrag(null);
     setMoveDrag(null);
     setRowMeasurements({});
+    setSelectedSessionGroupIds([]);
   }, [selectedKey, visibleHours]);
 
   useEffect(() => {
@@ -419,6 +426,7 @@ export default function AddScreen() {
       return;
     }
 
+    setSelectedSessionGroupIds([]);
     setEditingSession(null);
     setTargetHour(visibleHours.includes(normalizeHour(hour)) ? normalizeHour(hour) : getDefaultTargetHour(visibleHours));
     setTargetMinute(normalizeMinute(minute));
@@ -426,11 +434,23 @@ export default function AddScreen() {
     setIsModalVisible(true);
   };
 
+  useEffect(() => {
+    const openComposerToken = route.params?.openComposerToken;
+
+    if (!openComposerToken || openComposerToken === lastOpenComposerTokenRef.current) {
+      return;
+    }
+
+    lastOpenComposerTokenRef.current = openComposerToken;
+    openModal();
+  }, [openModal, route.params?.openComposerToken]);
+
   const openEditModal = (session: WalkingSession) => {
     if (!canEditSelectedDate) {
       return;
     }
 
+    setSelectedSessionGroupIds([]);
     setEditingSession(session);
     setTargetHour(new Date(session.createdAt).getHours());
     setTargetMinute(new Date(session.createdAt).getMinutes());
@@ -574,7 +594,7 @@ export default function AddScreen() {
   };
 
   const getCreateDragHandlers = (hour: number) =>
-    canEditSelectedDate
+    canEditSelectedDate && !isSelectionMode
       ? PanResponder.create({
           onMoveShouldSetPanResponder: (_event, gestureState) =>
             Math.abs(gestureState.dy) > DRAG_ACTIVATION_DISTANCE,
@@ -598,7 +618,7 @@ export default function AddScreen() {
       : {};
 
   const getMoveDragHandlers = (session: WalkingSession) =>
-    canEditSelectedDate
+    canEditSelectedDate && !isSelectionMode
       ? PanResponder.create({
           onMoveShouldSetPanResponder: (_event, gestureState) =>
             Math.abs(gestureState.dy) > DRAG_ACTIVATION_DISTANCE,
@@ -623,6 +643,30 @@ export default function AddScreen() {
           },
         }).panHandlers
       : {};
+
+  const startSessionSelection = (session: WalkingSession) => {
+    const groupId = getSessionGroupId(session);
+
+    setSelectedSessionGroupIds((currentGroupIds) =>
+      currentGroupIds.includes(groupId) ? currentGroupIds : [...currentGroupIds, groupId],
+    );
+    triggerSelectionHaptic();
+  };
+
+  const toggleSessionSelection = (session: WalkingSession) => {
+    const groupId = getSessionGroupId(session);
+
+    setSelectedSessionGroupIds((currentGroupIds) =>
+      currentGroupIds.includes(groupId)
+        ? currentGroupIds.filter((currentGroupId) => currentGroupId !== groupId)
+        : [...currentGroupIds, groupId],
+    );
+    triggerSelectionHaptic();
+  };
+
+  const clearSessionSelection = () => {
+    setSelectedSessionGroupIds([]);
+  };
 
   const confirmDeleteSession = (session: WalkingSession) => {
     setSessionPendingDelete(session);
@@ -657,6 +701,30 @@ export default function AddScreen() {
     setUndoSessions(null);
     pushToast('Walking session restored.', 'success');
     await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleDeleteSelectedSessions = async () => {
+    if (!selectedSessionGroupIds.length) {
+      return;
+    }
+
+    const deletedSessions = allSessions.filter((session) => selectedSessionGroupIdSet.has(getSessionGroupId(session)));
+    const representativeSessions = selectedSessionGroupIds.flatMap((groupId) => {
+      const session = allSessions.find((currentSession) => getSessionGroupId(currentSession) === groupId);
+      return session ? [session] : [];
+    });
+
+    for (const session of representativeSessions) {
+      await deleteWalkingSession(session.date, session);
+    }
+
+    clearSessionSelection();
+    setUndoSessions(deletedSessions);
+    pushToast(
+      `${representativeSessions.length} walking session${representativeSessions.length === 1 ? '' : 's'} deleted.`,
+      'success',
+    );
+    await triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
   };
 
   const renderToastCard = (toastItem: ToastMessage) =>
@@ -763,9 +831,9 @@ export default function AddScreen() {
             <View style={styles.summaryRingWrap}>
               <GoalProgressRing
                 colors={colors}
-                goal={settings.dailyGoalMinutes}
-                label={`${Math.round((totalMinutes / settings.dailyGoalMinutes) * 100) || 0}%`}
-                progressColor={totalMinutes >= settings.dailyGoalMinutes ? colors.success : undefined}
+                goal={selectedDailyGoalMinutes}
+                label={`${Math.round((totalMinutes / selectedDailyGoalMinutes) * 100) || 0}%`}
+                progressColor={totalMinutes >= selectedDailyGoalMinutes ? colors.success : undefined}
                 sublabel="goal"
                 value={totalMinutes}
               />
@@ -801,6 +869,10 @@ export default function AddScreen() {
             onOpenEditModal={openEditModal}
             onOpenModal={openModal}
             onRowLayout={handleTimelineRowLayout}
+            onSessionLongPress={startSessionSelection}
+            onToggleSessionSelection={toggleSessionSelection}
+            selectedSessionGroupIds={selectedSessionGroupIdSet}
+            selectionMode={isSelectionMode}
             setRowRef={(hour, node) => {
               timelineRowRefs.current[hour] = node;
             }}
@@ -810,13 +882,23 @@ export default function AddScreen() {
         </ScrollView>
       </View>
 
-      {canEditSelectedDate ? (
-        <Pressable accessibilityLabel="Add walking session" accessibilityRole="button" onPress={() => openModal()} style={styles.floatingBarWrap}>
-          <View style={styles.floatingBar}>
-            <Ionicons color={colors.textPrimary} name="add" size={24} />
-            <Text style={styles.floatingBarText}>Add walking session</Text>
+      {isSelectionMode ? (
+        <View style={styles.selectionBarWrap}>
+          <View style={styles.selectionBar}>
+            <Text style={styles.selectionBarText}>
+              {selectedSessionGroupIds.length} selected
+            </Text>
+            <View style={styles.selectionBarActions}>
+              <Pressable accessibilityRole="button" onPress={clearSessionSelection} style={styles.selectionSecondaryButton}>
+                <Text style={styles.selectionSecondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={handleDeleteSelectedSessions} style={styles.selectionPrimaryButton}>
+                <Ionicons color={colors.textPrimary} name="trash-outline" size={18} />
+                <Text style={styles.selectionPrimaryButtonText}>Delete</Text>
+              </Pressable>
+            </View>
           </View>
-        </Pressable>
+        </View>
       ) : null}
 
       {!isModalVisible && (toastItems.length || undoSessions?.length) ? (

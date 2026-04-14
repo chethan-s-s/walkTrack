@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { useWalkingData } from '../../context/WalkingDataContext';
 import { useAppColors } from '../../theme/useAppColors';
+import { getDateKey } from '../../storage/walkingStorage';
 import { DashboardSectionKey } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
 import { buildAppDataSnapshot, parseAppDataSnapshot } from '../../utils/dataTransfer';
@@ -156,6 +157,7 @@ export default function MoreScreen() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const {
+    getDailyGoalMinutesForDate,
     moveDashboardSection,
     replaceSettings,
     setDailyGoalMinutes,
@@ -169,8 +171,9 @@ export default function MoreScreen() {
     toggleDashboardSectionHidden,
   } = useAppSettings();
   const { entries, replaceWalkingEntries } = useWalkingData();
-  const isDailyGoalMinned = settings.dailyGoalMinutes <= MIN_DAILY_GOAL_MINUTES;
-  const isDailyGoalMaxed = settings.dailyGoalMinutes >= MAX_DAILY_GOAL_MINUTES;
+  const currentDailyGoalMinutes = getDailyGoalMinutesForDate(getDateKey());
+  const isDailyGoalMinned = currentDailyGoalMinutes <= MIN_DAILY_GOAL_MINUTES;
+  const isDailyGoalMaxed = currentDailyGoalMinutes >= MAX_DAILY_GOAL_MINUTES;
   const isWeeklyGoalDaysMinned = settings.weeklyGoalDays <= MIN_WEEKLY_GOAL_DAYS;
   const isWeeklyGoalDaysMaxed = settings.weeklyGoalDays >= MAX_WEEKLY_GOAL_DAYS;
   const visibleTimelineHours = getTimelineSpanHours(settings.timelineStartHour, settings.timelineEndHour);
@@ -367,20 +370,20 @@ export default function MoreScreen() {
               <View style={styles.stepperControls}>
                 <Pressable
                   disabled={isDailyGoalMinned}
-                  onPress={() => void setDailyGoalMinutes(settings.dailyGoalMinutes - 5)}
+                  onPress={() => void setDailyGoalMinutes(currentDailyGoalMinutes - 5)}
                   style={[styles.stepperButton, isDailyGoalMinned && styles.stepperButtonDisabled]}
                 >
                   <Ionicons color={isDailyGoalMinned ? colors.textMuted : colors.textPrimary} name="remove" size={18} />
                 </Pressable>
                 <View style={styles.stepperValueWrap}>
                   <Text adjustsFontSizeToFit numberOfLines={1} style={styles.stepperValue}>
-                    {formatDuration(settings.dailyGoalMinutes)}
+                    {formatDuration(currentDailyGoalMinutes)}
                   </Text>
                   <Text style={styles.stepperMeta}>daily target</Text>
                 </View>
                 <Pressable
                   disabled={isDailyGoalMaxed}
-                  onPress={() => void setDailyGoalMinutes(settings.dailyGoalMinutes + 5)}
+                  onPress={() => void setDailyGoalMinutes(currentDailyGoalMinutes + 5)}
                   style={[styles.stepperButton, isDailyGoalMaxed && styles.stepperButtonDisabled]}
                 >
                   <Ionicons color={isDailyGoalMaxed ? colors.textMuted : colors.textPrimary} name="add" size={18} />

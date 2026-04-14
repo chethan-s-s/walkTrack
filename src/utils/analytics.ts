@@ -1,5 +1,6 @@
-import { WalkingEntry, WeekStartDay } from '../types';
+import { UserSettings, WalkingEntry, WeekStartDay } from '../types';
 import { getDateKey } from '../storage/walkingStorage';
+import { getDailyGoalMinutesForDate } from './dailyGoals';
 
 export const getWeekStartDate = (date = new Date(), weekStart: WeekStartDay = 'monday') => {
   const nextDate = new Date(date);
@@ -24,16 +25,19 @@ export const getWeekDates = (date = new Date(), weekStart: WeekStartDay = 'monda
 
 export const getWeeklyGoalHitCount = (
   entries: WalkingEntry[],
-  dailyGoalMinutes: number,
+  settings: UserSettings,
+  date = new Date(),
   weekStart: WeekStartDay = 'monday',
 ) => {
-  const today = new Date();
-  const weekDates = getWeekDates(today, weekStart);
+  const weekDates = getWeekDates(date, weekStart);
   const startKey = getDateKey(weekDates[0]);
   const endKey = getDateKey(weekDates[weekDates.length - 1]);
 
   return entries.filter(
-    (entry) => entry.date >= startKey && entry.date <= endKey && entry.totalMinutes >= dailyGoalMinutes,
+    (entry) =>
+      entry.date >= startKey &&
+      entry.date <= endKey &&
+      entry.totalMinutes >= getDailyGoalMinutesForDate(settings, entry.date),
   ).length;
 };
 
@@ -202,12 +206,12 @@ export const getFilteredHistoryEntries = (
   });
 };
 
-export const getCurrentStreak = (entries: WalkingEntry[], dailyGoalMinutes: number) => {
+export const getCurrentStreak = (entries: WalkingEntry[], settings: UserSettings, date = new Date()) => {
   const entryMap = new Map(entries.map((entry) => [entry.date, entry.totalMinutes]));
   let streak = 0;
-  const cursor = new Date();
+  const cursor = new Date(date);
 
-  while ((entryMap.get(getDateKey(cursor)) ?? 0) >= dailyGoalMinutes) {
+  while ((entryMap.get(getDateKey(cursor)) ?? 0) >= getDailyGoalMinutesForDate(settings, getDateKey(cursor))) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }

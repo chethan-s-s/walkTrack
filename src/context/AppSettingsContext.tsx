@@ -9,12 +9,15 @@ import React, {
 } from 'react';
 
 import { DashboardSectionKey, UserSettings, WeekStartDay } from '../types';
+import { getDateKey } from '../storage/walkingStorage';
 import { defaultSettings, saveSettings, loadSettings } from '../storage/settingsStorage';
+import { getDailyGoalMinutesForDate as resolveDailyGoalMinutesForDate } from '../utils/dailyGoals';
 
 type AppSettingsContextValue = {
   settings: UserSettings;
   settingsLoading: boolean;
   replaceSettings: (nextSettings: UserSettings) => Promise<void>;
+  getDailyGoalMinutesForDate: (date: string) => number;
   setWeekStart: (value: WeekStartDay) => Promise<void>;
   setDailyGoalMinutes: (value: number) => Promise<void>;
   setWeeklyGoalDays: (value: number) => Promise<void>;
@@ -77,12 +80,24 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
 
   const setDailyGoalMinutes = useCallback(
     async (value: number) => {
+      const nextGoalMinutes = clampDailyGoalMinutes(value);
+      const dateKey = getDateKey();
+
       await updateSettings((currentSettings) => ({
         ...currentSettings,
-        dailyGoalMinutes: clampDailyGoalMinutes(value),
+        dailyGoalMinutes: nextGoalMinutes,
+        dailyGoalHistory: [
+          ...currentSettings.dailyGoalHistory.filter((entry) => entry.date !== dateKey),
+          { date: dateKey, minutes: nextGoalMinutes },
+        ].sort((left, right) => left.date.localeCompare(right.date)),
       }));
     },
     [updateSettings],
+  );
+
+  const getDailyGoalMinutesForDate = useCallback(
+    (date: string) => resolveDailyGoalMinutesForDate(settings, date),
+    [settings],
   );
 
   const setWeeklyGoalDays = useCallback(
@@ -204,6 +219,7 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
       settings,
       settingsLoading,
       replaceSettings,
+      getDailyGoalMinutesForDate,
       setWeekStart,
       setDailyGoalMinutes,
       setWeeklyGoalDays,

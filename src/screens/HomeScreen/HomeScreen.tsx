@@ -17,6 +17,7 @@ import {
   getAverageSessionLength,
   getBestDay,
   getCurrentStreak,
+  getWeekStartDate,
   getMilestoneBadge,
   getMonthlyHeatmapCalendar,
   getTotalMinutesThisMonth,
@@ -67,8 +68,11 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { entries, loading, todayMinutes } = useWalkingData();
-  const { settings } = useAppSettings();
+  const { getDailyGoalMinutesForDate, settings } = useAppSettings();
+  const todayKey = getDateKey();
+  const currentDailyGoalMinutes = getDailyGoalMinutesForDate(todayKey);
   const currentDateLabel = formatDashboardDate(new Date());
+  const [selectedRhythmWeekDate, setSelectedRhythmWeekDate] = useState(() => new Date());
   const [selectedHeatmapMonth, setSelectedHeatmapMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -80,7 +84,7 @@ export default function HomeScreen() {
   }, []);
 
   const weeklyBars = useMemo(() => {
-    return getWeekDates(new Date(), settings.weekStart).map((date) => {
+    return getWeekDates(selectedRhythmWeekDate, settings.weekStart).map((date) => {
       const key = getDateKey(date);
       const minutes = entries.find((entry) => entry.date === key)?.totalMinutes ?? 0;
 
@@ -90,22 +94,22 @@ export default function HomeScreen() {
         minutes,
       };
     });
-  }, [entries, settings.weekStart]);
+  }, [entries, selectedRhythmWeekDate, settings.weekStart]);
 
   const maxMinutes = Math.max(...weeklyBars.map((item) => item.minutes), 30);
-  const weeklyMinutes = useMemo(
+  const selectedWeekMinutes = useMemo(
     () => weeklyBars.reduce((total, bar) => total + bar.minutes, 0),
     [weeklyBars],
   );
   const weeklyGoalHits = useMemo(
-    () => getWeeklyGoalHitCount(entries, settings.dailyGoalMinutes, settings.weekStart),
-    [entries, settings.dailyGoalMinutes, settings.weekStart],
+    () => getWeeklyGoalHitCount(entries, settings, new Date(), settings.weekStart),
+    [entries, settings],
   );
   const bestDay = useMemo(() => getBestDay(entries), [entries]);
   const averageSessionLength = useMemo(() => getAverageSessionLength(entries), [entries]);
   const totalMinutesThisMonth = useMemo(() => getTotalMinutesThisMonth(entries), [entries]);
   const weeklyTrend = useMemo(() => getWeeklyTrend(entries, settings.weekStart), [entries, settings.weekStart]);
-  const currentStreak = useMemo(() => getCurrentStreak(entries, settings.dailyGoalMinutes), [entries, settings.dailyGoalMinutes]);
+  const currentStreak = useMemo(() => getCurrentStreak(entries, settings), [entries, settings]);
   const milestoneBadge = useMemo(() => getMilestoneBadge(entries), [entries]);
   const heatmapCalendar = useMemo(
     () => getMonthlyHeatmapCalendar(entries, selectedHeatmapMonth, settings.weekStart),
@@ -119,8 +123,25 @@ export default function HomeScreen() {
     selectedHeatmapMonth.getFullYear() < currentMonthStart.getFullYear() ||
     (selectedHeatmapMonth.getFullYear() === currentMonthStart.getFullYear() &&
       selectedHeatmapMonth.getMonth() < currentMonthStart.getMonth());
-  const remainingGoalMinutes = Math.max(settings.dailyGoalMinutes - todayMinutes, 0);
-  const isGoalReached = todayMinutes >= settings.dailyGoalMinutes;
+  const currentRhythmWeekStart = useMemo(() => getWeekStartDate(new Date(), settings.weekStart), [settings.weekStart]);
+  const selectedRhythmWeekStart = useMemo(
+    () => getWeekStartDate(selectedRhythmWeekDate, settings.weekStart),
+    [selectedRhythmWeekDate, settings.weekStart],
+  );
+  const canGoToNextRhythmWeek = selectedRhythmWeekStart.getTime() < currentRhythmWeekStart.getTime();
+  const rhythmWeekLabel = useMemo(() => {
+    const startDate = weeklyBars[0] ? new Date(weeklyBars[0].key) : selectedRhythmWeekStart;
+    const endDate = weeklyBars[weeklyBars.length - 1]
+      ? new Date(weeklyBars[weeklyBars.length - 1].key)
+      : selectedRhythmWeekStart;
+
+    const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    return `${startLabel} - ${endLabel}`;
+  }, [selectedRhythmWeekStart, weeklyBars]);
+  const remainingGoalMinutes = Math.max(currentDailyGoalMinutes - todayMinutes, 0);
+  const isGoalReached = todayMinutes >= currentDailyGoalMinutes;
   useEffect(() => {
     if (!heatmapTooltip) {
       return undefined;
@@ -144,6 +165,19 @@ export default function HomeScreen() {
       return nextMonth;
     });
     setHeatmapTooltip(null);
+  };
+
+  const changeRhythmWeek = (direction: -1 | 1) => {
+    setSelectedRhythmWeekDate((currentDate) => {
+      const nextDate = new Date(currentDate);
+      nextDate.setDate(nextDate.getDate() + direction * 7);
+
+      if (direction === 1 && getWeekStartDate(nextDate, settings.weekStart) > currentRhythmWeekStart) {
+        return currentDate;
+      }
+
+      return nextDate;
+    });
   };
 
   const dashboardSections = useMemo(() => {
@@ -172,15 +206,7 @@ export default function HomeScreen() {
               <Text style={styles.insightMeta}>Across all sessions</Text>
             </View>
 
-            <View style={styles.insightTile}>
-              <Text style={styles.insightLabel}>This week</Text>
-              <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
-                {formatDuration(weeklyMinutes)}
-              </Text>
-              <Text style={styles.insightMeta}>Total logged this week</Text>
-            </View>
-
-            <View style={styles.insightTile}>
+            <View style={styles.insightTileWide}>
               <Text style={styles.insightLabel}>This month</Text>
               <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.insightValue}>
                 {formatDuration(totalMinutesThisMonth)}
@@ -192,8 +218,37 @@ export default function HomeScreen() {
       ),
       weeklyRhythm: (
         <View style={styles.chartCard}>
-          <Text style={styles.sectionTitle}>Weekly Rhythm</Text>
-          <Text style={styles.sectionSubtitle}>This week at a glance.</Text>
+          <View style={styles.chartHeaderRow}>
+            <View style={styles.sectionTextWrap}>
+              <Text style={styles.sectionTitle}>Weekly Rhythm</Text>
+              <Text style={styles.sectionSubtitle}>{rhythmWeekLabel}</Text>
+            </View>
+
+            <View style={styles.chartHeaderMetaWrap}>
+              <View style={styles.chartWeekBadge}>
+                <Text style={styles.chartWeekBadgeText}>{formatDuration(selectedWeekMinutes)}</Text>
+              </View>
+              <View style={styles.chartWeekNav}>
+                <Pressable
+                  accessibilityLabel="Show previous week"
+                  accessibilityRole="button"
+                  onPress={() => changeRhythmWeek(-1)}
+                  style={styles.chartWeekButton}
+                >
+                  <Ionicons color={colors.textPrimary} name="chevron-back" size={16} />
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Show next week"
+                  accessibilityRole="button"
+                  disabled={!canGoToNextRhythmWeek}
+                  onPress={() => changeRhythmWeek(1)}
+                  style={[styles.chartWeekButton, !canGoToNextRhythmWeek && styles.chartWeekButtonDisabled]}
+                >
+                  <Ionicons color={canGoToNextRhythmWeek ? colors.textPrimary : colors.textMuted} name="chevron-forward" size={16} />
+                </Pressable>
+              </View>
+            </View>
+          </View>
           <View style={styles.chartWrap}>
             {weeklyBars.map((bar) => {
               const height = Math.max((bar.minutes / maxMinutes) * 120, bar.minutes > 0 ? 12 : 6);
@@ -229,7 +284,7 @@ export default function HomeScreen() {
 
           <View style={styles.sparklineRow}>
             {[weeklyTrend.previousWeekTotal, weeklyTrend.thisWeekTotal].map((value, index) => {
-              const maxValue = Math.max(weeklyTrend.thisWeekTotal, weeklyTrend.previousWeekTotal, settings.dailyGoalMinutes);
+              const maxValue = Math.max(weeklyTrend.thisWeekTotal, weeklyTrend.previousWeekTotal, currentDailyGoalMinutes);
               const height = Math.max((value / maxValue) * 52, 8);
 
               return (
@@ -339,19 +394,22 @@ export default function HomeScreen() {
   }, [
     averageSessionLength,
     bestDay,
+    canGoToNextRhythmWeek,
+    changeRhythmWeek,
     colors,
     currentStreak,
+    currentDailyGoalMinutes,
     heatmapCalendar,
     heatmapMaxMinutes,
     milestoneBadge,
     maxMinutes,
-    settings.dailyGoalMinutes,
     settings.dashboardOrder,
     settings.hiddenDashboardSections,
     canGoToNextHeatmapMonth,
     heatmapTooltip,
+    rhythmWeekLabel,
+    selectedWeekMinutes,
     totalMinutesThisMonth,
-    weeklyMinutes,
     weeklyBars,
     weeklyGoalHits,
     weeklyTrend,
@@ -378,8 +436,8 @@ export default function HomeScreen() {
           <View style={styles.goalsTopRow}>
             <GoalProgressRing
               colors={colors}
-              goal={settings.dailyGoalMinutes}
-              label={`${Math.round((todayMinutes / settings.dailyGoalMinutes) * 100) || 0}%`}
+              goal={currentDailyGoalMinutes}
+              label={`${Math.round((todayMinutes / currentDailyGoalMinutes) * 100) || 0}%`}
               sublabel="goal"
               value={todayMinutes}
             />
@@ -387,7 +445,7 @@ export default function HomeScreen() {
             <View style={styles.goalsTextWrap}>
               <Text style={styles.goalEyebrow}>Daily Goal</Text>
               <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.goalHeadline}>
-                {formatDuration(todayMinutes)} / {formatDuration(settings.dailyGoalMinutes)}
+                {formatDuration(todayMinutes)} / {formatDuration(currentDailyGoalMinutes)}
               </Text>
               <Text style={styles.goalMeta}>
                 {weeklyGoalHits}/7 days hit · Weekly target {settings.weeklyGoalDays} days
@@ -418,23 +476,6 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : null}
-        </View>
-
-        <View style={styles.statGrid}>
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Today</Text>
-            <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.cardValue}>
-              {formatDuration(todayMinutes)}
-            </Text>
-            <Text style={styles.cardMeta}>{isGoalReached ? 'Goal reached' : `${formatDuration(remainingGoalMinutes)} left`}</Text>
-          </View>
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>This week</Text>
-            <Text adjustsFontSizeToFit ellipsizeMode="tail" numberOfLines={1} style={styles.cardValue}>
-              {formatDuration(weeklyMinutes)}
-            </Text>
-            <Text style={styles.cardMeta}>{weeklyGoalHits}/7 goal days hit</Text>
-          </View>
         </View>
 
         {dashboardSections}

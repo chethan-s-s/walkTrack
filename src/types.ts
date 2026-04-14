@@ -18,9 +18,15 @@ export type WeekStartDay = 'sunday' | 'monday';
 
 export type DashboardSectionKey = 'insights' | 'weeklyRhythm' | 'weeklyTrend' | 'heatmap';
 
+export type DailyGoalHistoryEntry = {
+  date: string;
+  minutes: number;
+};
+
 export type UserSettings = {
   weekStart: WeekStartDay;
   dailyGoalMinutes: number;
+  dailyGoalHistory: DailyGoalHistoryEntry[];
   weeklyGoalDays: number;
   weeklyGoalMinutes: number;
   monthlyGoalMinutes: number;
@@ -34,7 +40,8 @@ export type UserSettings = {
 
 export type RootTabParamList = {
   Home: undefined;
-  Add: undefined;
+  Add: { openComposerToken?: number } | undefined;
+  Compose: undefined;
   History: undefined;
   More: undefined;
 };

@@ -42,6 +42,10 @@ type AddTimelineProps = {
   onOpenEditModal: (session: WalkingSession) => void;
   onOpenModal: (hour?: number, minutes?: string, minute?: number) => void;
   onRowLayout: (hour: number, event: LayoutChangeEvent) => void;
+  onSessionLongPress: (session: WalkingSession) => void;
+  onToggleSessionSelection: (session: WalkingSession) => void;
+  selectedSessionGroupIds: Set<string>;
+  selectionMode: boolean;
   setRowRef: (hour: number, node: View | null) => void;
   suggestedStartMinutes: Map<number, number | null>;
   styles: ReturnType<typeof createStyles>;
@@ -62,6 +66,10 @@ export default function AddTimeline({
   onOpenEditModal,
   onOpenModal,
   onRowLayout,
+  onSessionLongPress,
+  onToggleSessionSelection,
+  selectedSessionGroupIds,
+  selectionMode,
   setRowRef,
   suggestedStartMinutes,
   styles,
@@ -117,7 +125,7 @@ export default function AddTimeline({
             ]}
           >
             <View style={styles.timelineHeaderRow}>
-              {canEditSelectedDate && suggestedMinute !== null ? (
+              {canEditSelectedDate && !selectionMode && suggestedMinute !== null ? (
                 <View {...getCreateDragHandlers(hour)}>
                   <Pressable
                     accessibilityLabel={`Add session around ${formatHourLabel(hour)}`}
@@ -137,14 +145,36 @@ export default function AddTimeline({
             </View>
             {sessions.length ? (
               <View style={styles.sessionList}>
-                {sessions.map((session) => (
-                  <View key={session.id} {...getMoveDragHandlers(session.logicalSession)}>
+                {sessions.map((session) => {
+                  const groupId = session.logicalSession.batchId ?? session.logicalSession.id;
+                  const isSelected = selectedSessionGroupIds.has(groupId);
+
+                  return (
+                  <View
+                    key={session.id}
+                    style={styles.sessionSelectableWrap}
+                    {...(selectionMode ? {} : getMoveDragHandlers(session.logicalSession))}
+                  >
+                    {selectionMode ? (
+                      <View style={[styles.sessionSelectionIndicator, isSelected && styles.sessionSelectionIndicatorActive]}>
+                        {isSelected ? <Ionicons color={colors.background} name="checkmark" size={14} /> : null}
+                      </View>
+                    ) : null}
                     <Pressable
                       accessibilityHint={canEditSelectedDate ? 'Use the edit button to modify this session.' : undefined}
                       accessibilityLabel={`${session.displayMinutes} minute walk, ${formatSessionTimeRange(session.segment.createdAt, session.segment.minutes)}`}
+                      delayLongPress={220}
+                      onLongPress={() => onSessionLongPress(session.logicalSession)}
+                      onPress={() => {
+                        if (selectionMode) {
+                          onToggleSessionSelection(session.logicalSession);
+                        }
+                      }}
                       accessibilityRole="summary"
                       style={[
                         styles.sessionCard,
+                        selectionMode && styles.sessionCardSelectable,
+                        isSelected && styles.sessionCardSelected,
                         moveDragSessionId === session.logicalSession.id && styles.sessionCardDragging,
                       ]}
                     >
@@ -157,7 +187,7 @@ export default function AddTimeline({
                           {formatSessionTimeRange(session.segment.createdAt, session.segment.minutes)}
                         </Text>
                       </View>
-                      {canEditSelectedDate ? (
+                      {canEditSelectedDate && !selectionMode ? (
                         <View style={styles.sessionActions}>
                           <Pressable
                             accessibilityLabel={`Edit ${session.logicalSession.minutes} minute session`}
@@ -187,7 +217,8 @@ export default function AddTimeline({
                       ) : null}
                     </Pressable>
                   </View>
-                ))}
+                  );
+                })}
               </View>
             ) : (
               <View style={styles.emptyHourWrap} />
