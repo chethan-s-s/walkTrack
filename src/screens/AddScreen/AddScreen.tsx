@@ -985,8 +985,10 @@ export default function AddScreen({ navigation, route }: BottomTabScreenProps<Ro
         onChangeDraftMinutes={setDraftMinutes}
         onClose={closeModal}
         onSave={saveMinutes}
-        onShiftTargetHour={shiftTargetHour}
-        onShiftTargetMinute={shiftTargetMinute}
+        onUpdateStartTime={(hour, minute) => {
+          setTargetHour(hour);
+          setTargetMinute(minute);
+        }}
         quickMinutes={QUICK_MINUTES}
         selectedDate={selectedDate}
         selectedKey={selectedKey}

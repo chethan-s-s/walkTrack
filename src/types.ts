@@ -24,6 +24,7 @@ export type DailyGoalHistoryEntry = {
 };
 
 export type UserSettings = {
+  schemaVersion: number;
   weekStart: WeekStartDay;
   dailyGoalMinutes: number;
   dailyGoalHistory: DailyGoalHistoryEntry[];

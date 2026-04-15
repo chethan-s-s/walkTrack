@@ -11,6 +11,10 @@ import {
 
 const SETTINGS_STORAGE_KEY = 'walking-tracker/settings-v1';
 
+// Increment this whenever a new field is added to UserSettings.
+// Add a corresponding migration step in migrateSettings() below.
+const CURRENT_SCHEMA_VERSION = 1;
+
 export const DEFAULT_DASHBOARD_ORDER: DashboardSectionKey[] = [
   'insights',
   'weeklyRhythm',
@@ -19,6 +23,7 @@ export const DEFAULT_DASHBOARD_ORDER: DashboardSectionKey[] = [
 ];
 
 export const defaultSettings: UserSettings = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   weekStart: 'monday',
   dailyGoalMinutes: DAILY_GOAL_MINUTES,
   dailyGoalHistory: [{ date: GOAL_HISTORY_BASE_DATE, minutes: DAILY_GOAL_MINUTES }],
@@ -105,6 +110,7 @@ const normalizeDailyGoalHistory = (value: unknown, fallbackMinutes: number): Dai
 };
 
 const normalizeSettings = (value: Partial<UserSettings> | null | undefined): UserSettings => ({
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   dailyGoalMinutes:
     typeof value?.dailyGoalMinutes === 'number' && value.dailyGoalMinutes >= 5
       ? Math.round(value.dailyGoalMinutes)
@@ -139,6 +145,30 @@ const normalizeSettings = (value: Partial<UserSettings> | null | undefined): Use
   hiddenDashboardSections: normalizeHiddenDashboardSections(value?.hiddenDashboardSections),
 });
 
+/**
+ * Apply incremental migrations for stored settings that are behind the current schema version.
+ * Add a new `case` block here whenever CURRENT_SCHEMA_VERSION is bumped.
+ * Each case should mutate `data` in-place and fall through to the next version.
+ */
+const migrateSettings = (data: Record<string, unknown>): Record<string, unknown> => {
+  const storedVersion = typeof data.schemaVersion === 'number' ? data.schemaVersion : 0;
+
+  // Versions are applied sequentially so each migration only needs to handle one step.
+  // Example for a future version 2:
+  //   case 1:
+  //     data.newField = defaultValue;
+  //     // falls through to case 2, 3, etc.
+  switch (storedVersion) {
+    case 0:
+      // v0 → v1: schemaVersion field did not exist; normalizeSettings will set it.
+      break;
+    default:
+      break;
+  }
+
+  return data;
+};
+
 export async function loadSettings(): Promise<UserSettings> {
   const raw = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
 
@@ -147,8 +177,9 @@ export async function loadSettings(): Promise<UserSettings> {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return normalizeSettings(parsed);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const migrated = migrateSettings(parsed);
+    return normalizeSettings(migrated as Partial<UserSettings>);
   } catch {
     return defaultSettings;
   }

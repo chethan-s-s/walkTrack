@@ -33,7 +33,7 @@ export type AppColors = {
 const darkColors: AppColors = {
   isLight: false,
   background: '#08090c',
-  surface: '#16181d',
+  surface: '#15151c',
   surfaceAlt: '#1f232a',
   surfaceMuted: '#2a2f38',
   textPrimary: '#fafafa',

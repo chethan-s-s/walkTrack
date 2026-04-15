@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -19,6 +19,7 @@ import {
   formatReadableDate,
 } from '../../../utils/time';
 import { createStyles } from '../AddScreenStyles';
+import TimeWheelModal from './TimeWheelModal';
 
 type SessionModalProps = {
   colors: AppColors;
@@ -37,8 +38,7 @@ type SessionModalProps = {
   onChangeDraftMinutes: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
-  onShiftTargetHour: (delta: -1 | 1) => void;
-  onShiftTargetMinute: (delta: -1 | 1) => void;
+  onUpdateStartTime: (hour: number, minute: number) => void;
 };
 
 export default function SessionModal({
@@ -58,12 +58,12 @@ export default function SessionModal({
   onChangeDraftMinutes,
   onClose,
   onSave,
-  onShiftTargetHour,
-  onShiftTargetMinute,
+  onUpdateStartTime,
 }: SessionModalProps) {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(24)).current;
   const sheetScale = useRef(new Animated.Value(0.98)).current;
+  const [isTimeWheelVisible, setIsTimeWheelVisible] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -133,70 +133,35 @@ export default function SessionModal({
               />
               <Text style={styles.modalCounterUnit}>min</Text>
             </View>
-            <View style={styles.timePickerRow}>
-              <View style={styles.timePickerField}>
-                <Text style={styles.timePickerLabel}>Hour</Text>
-                <View style={styles.timeStepperRow}>
-                  <Pressable
-                    accessibilityLabel="Decrease hour"
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => onShiftTargetHour(-1)}
-                    style={styles.timeAdjustButton}
-                  >
-                    <Ionicons color={colors.textPrimary} name="remove" size={16} />
-                  </Pressable>
-                  <View style={styles.timeAdjustCenter}>
-                    <Text adjustsFontSizeToFit numberOfLines={1} style={styles.timeAdjustLabel}>
-                      {formatHourLabel(targetHour)}
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityLabel="Increase hour"
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => onShiftTargetHour(1)}
-                    style={styles.timeAdjustButton}
-                  >
-                    <Ionicons color={colors.textPrimary} name="add" size={16} />
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={styles.timePickerField}>
-                <Text style={styles.timePickerLabel}>Minute</Text>
-                <View style={styles.timeStepperRow}>
-                  <Pressable
-                    accessibilityLabel="Decrease minute"
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => onShiftTargetMinute(-1)}
-                    style={styles.timeAdjustButton}
-                  >
-                    <Ionicons color={colors.textPrimary} name="remove" size={16} />
-                  </Pressable>
-                  <View style={styles.timeAdjustCenter}>
-                    <Text adjustsFontSizeToFit numberOfLines={1} style={styles.timeAdjustLabel}>
-                      {String(targetMinute).padStart(2, '0')}
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityLabel="Increase minute"
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => onShiftTargetMinute(1)}
-                    style={styles.timeAdjustButton}
-                  >
-                    <Ionicons color={colors.textPrimary} name="add" size={16} />
-                  </Pressable>
-                </View>
-              </View>
-            </View>
             <Text style={styles.modalCounterMeta}>
               For {formatReadableDate(selectedDate)} ·{' '}
               {formatDateKeyTimeRange(selectedKey, targetHour, targetMinute, Math.max(getPositiveMinutes(draftMinutes), 1))}
             </Text>
+            <Pressable
+              accessibilityLabel={`Change start time, currently ${formatHourLabel(targetHour)} ${String(targetMinute).padStart(2, '0')}`}
+              accessibilityRole="button"
+              onPress={() => setIsTimeWheelVisible(true)}
+              style={styles.startTimePill}
+            >
+              <Ionicons color={colors.textSecondary} name="time-outline" size={14} />
+              <Text style={styles.startTimePillText}>
+                {formatHourLabel(targetHour)} {String(targetMinute).padStart(2, '0')}
+              </Text>
+              <Ionicons color={colors.textMuted} name="chevron-forward" size={13} />
+            </Pressable>
           </View>
+
+          <TimeWheelModal
+            colors={colors}
+            initialHour={targetHour}
+            initialMinute={targetMinute}
+            onCancel={() => setIsTimeWheelVisible(false)}
+            onUpdate={(hour, minute) => {
+              onUpdateStartTime(hour, minute);
+              setIsTimeWheelVisible(false);
+            }}
+            visible={isTimeWheelVisible}
+          />
 
           <View style={styles.adjustRow}>
             {[-5, -1, 1, 5].map((delta) => (
@@ -240,10 +205,7 @@ export default function SessionModal({
           </View>
 
           <View style={styles.modalActionRow}>
-            <Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={onSave} style={styles.saveButtonWrap}>
+            <Pressable accessibilityRole="button" onPress={onSave} style={styles.saveButtonWrapFull}>
               <LinearGradient colors={[colors.actionSurface, colors.actionSurface]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.saveButton}>
                 <Ionicons color={colors.textPrimary} name={editingSession ? 'create-outline' : 'checkmark-circle'} size={22} />
                 <Text style={styles.saveButtonText}>{editingSession ? 'Save changes' : 'Add session'}</Text>

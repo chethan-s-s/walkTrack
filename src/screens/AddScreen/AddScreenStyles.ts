@@ -450,6 +450,26 @@ export const createStyles = (colors: AppColors) => StyleSheet.create({
   saveButtonWrap: {
     flex: 1.35,
   },
+  saveButtonWrapFull: {
+    flex: 1,
+  },
+  startTimePill: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.actionBorder,
+  },
+  startTimePillText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   saveButton: {
     borderRadius: 24,
     minHeight: 58,
